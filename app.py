@@ -332,7 +332,6 @@ with st.sidebar:
         if st.button("Очистить всё", width="stretch"):
             st.session_state.graph_history = []
             st.session_state.current_graph = None
-            st.rerun()
 
     st.markdown("---")
     st.caption("Для iPad Pro 11 дюймов")
@@ -371,7 +370,6 @@ if mode == "Мои графики":
                             with col_b:
                                 if st.button("Удалить", width="stretch", key=f"del_{i}_{j}"):
                                     st.session_state.graph_history.pop(i+j)
-                                    st.rerun()
 
                         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -487,7 +485,6 @@ else:
                         os.unlink(tmp.name)
 
                 st.success("График успешно построен")
-                st.rerun()
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
@@ -563,7 +560,6 @@ else:
                         os.unlink(tmp.name)
 
                 st.success("ОДУ успешно решена")
-                st.rerun()
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
@@ -637,7 +633,6 @@ else:
                         os.unlink(tmp.name)
 
                 st.success("Фазовый портрет успешно построен")
-                st.rerun()
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
@@ -667,7 +662,6 @@ if st.session_state.current_graph is not None and mode == "Построить г
 
         if st.button("Построить новый", width="stretch"):
             st.session_state.current_graph = None
-            st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
