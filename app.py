@@ -453,30 +453,22 @@ elif mode == "Загрузить Excel":
                                 var_names = ['s', 'w']
 
                                 # Начальные условия
-                                # Приоритет 1: ic_1/ic_2 (если есть)
-                                # Приоритет 2: a/w0 (если нет ic_1/ic_2)
-                                use_a_as_ic = row.get('ic_1') is None
-                                use_w0_as_ic = row.get('ic_2') is None
-
-                                ic_s = row.get('ic_1', row.get('a', 1.0))
-                                ic_w = row.get('ic_2', row.get('w0', 1.0))
+                                # s0 -> начальное условие для s
+                                # w0 -> начальное условие для w
+                                ic_s = row.get('ic_1', row.get('s0', 1.0))
+                                ic_w = row.get('ic_2', row.get('w0', 0.0))
                                 ics = [ic_s, ic_w]
 
+                                # Время интегрирования
                                 t_start = row.get('t_start', 0)
-                                t_end = row.get('t_end', row.get('s0', 100))
+                                t_end = row.get('t_end', 100)  # По умолчанию 100
 
                                 # Собираем параметры из колонок Excel
+                                # a, b, h, alpha, betta, c - это параметры уравнений
                                 params = {}
-                                all_param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c', 'w0']
+                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
 
-                                for param_name in all_param_cols:
-                                    # Пропускаем 'a' если использовали как начальное условие
-                                    if param_name == 'a' and use_a_as_ic:
-                                        continue
-                                    # Пропускаем 'w0' если использовали как начальное условие
-                                    if param_name == 'w0' and use_w0_as_ic:
-                                        continue
-
+                                for param_name in param_cols:
                                     if param_name in row and row[param_name] is not None:
                                         params[param_name] = row[param_name]
 
