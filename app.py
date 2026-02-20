@@ -472,10 +472,25 @@ elif mode == "Загрузить Excel":
                                     if param_name in row and row[param_name] is not None:
                                         params[param_name] = row[param_name]
 
-                                # Создаем стили
+                                # Создаем стили для каждой переменной
                                 color = row.get('color', 'blue')
-                                styles = [{"color": color, "linewidth": 2.0},
-                                         {"color": color, "linewidth": 2.0}]
+
+                                # Маппинг цветов из текста в matplotlib colors
+                                color_map = {
+                                    'cyan': '#00FFFF',
+                                    'black': '#000000',
+                                    'green': '#00FF00',
+                                    'greer': '#00FF00',  # опечатка в Excel
+                                    'blue': '#0000FF',
+                                    'red': '#FF0000'
+                                }
+                                actual_color = color_map.get(str(color).lower(), color)
+
+                                # Разные оттенки для s и w
+                                styles = [
+                                    {"color": actual_color, "linewidth": 2.0},  # для s
+                                    {"color": actual_color, "linewidth": 1.0, "alpha": 0.5}  # для w (тоньше)
+                                ]
 
                                 plotter.solve_and_plot_time(
                                     equations, var_names, ics, params,
