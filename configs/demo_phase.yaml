@@ -1,0 +1,36 @@
+type: phase_portrait
+
+curves:
+  - equations: ["y", "-\\sin(x) - 0.2*y"]
+    variable_names: [x, y]
+    initial_conditions: [0.5, 0]
+    t_span: [0, 40]
+    var_indices: [0, 1]
+    style: {color: "blue", linewidth: 1.5}
+
+  - equations: ["y", "-\\sin(x) - 0.2*y"]
+    variable_names: [x, y]
+    initial_conditions: [3, 0]
+    t_span: [0, 40]
+    var_indices: [0, 1]
+    style: {color: "red", linewidth: 1.5}
+
+  - equations: ["y", "-\\sin(x) - 0.2*y"]
+    variable_names: [x, y]
+    initial_conditions: [0, 3]
+    t_span: [0, 40]
+    var_indices: [0, 1]
+    style: {color: "green", linewidth: 1.5}
+
+vector_field:
+  enabled: true
+  density: 15
+
+axes:
+  xlim: [-4, 4]
+  ylim: [-3, 3]
+  xlabel: "x (angle)"
+  ylabel: "y (velocity)"
+  grid: true
+
+output: "demo_phase.svg"
