@@ -308,32 +308,31 @@ st.markdown("""
 
 def fix_latex(equation_str):
     r"""
-    Преобразует LaTeX с одинарными слешами в формат для SymPy (двойные слеши).
+    Квадрирует количество обратных слешей для SymPy через ODEPlotter.
 
-    Алгоритм с защитой существующих двойных слешей:
-    1. Заменяем \\\\ на уникальный маркер (защищаем двойные слеши)
-    2. Заменяем все оставшиеся \\ на \\\\  (удваиваем одинарные)
-    3. Возвращаем маркеры обратно в \\\\
+    Проблема: ODEPlotter/SymPy интерпретирует слеши дважды:
+    - Входная строка из UI: '-\sin(x)' (1 слеш в runtime)
+    - Нужно для SymPy: 4 слеша в runtime → 2 после первой интерпретации → 1 у SymPy
 
-    Примеры:
-        fix_latex('-\\sin(x)')      => '-\\\\sin(x)'
-        fix_latex('\\\\sin(x)')     => '\\\\sin(x)' (не меняется)
-        fix_latex('\\exp(\\beta)')  => '\\\\exp(\\\\beta)'
+    Решение: Удваиваем дважды (1 → 2 → 4)
     """
     if not equation_str or not isinstance(equation_str, str):
         return equation_str
 
-    # Используем символ null byte как маркер (гарантированно не встретится в формулах)
-    MARKER = '\x00'
+    # Считаем текущее количество слешей и умножаем на 4
+    result = equation_str
 
-    # Шаг 1: Защищаем существующие двойные слеши
-    result = equation_str.replace('\\\\', MARKER)
-
-    # Шаг 2: Удваиваем все оставшиеся одинарные слеши
+    # Первое удвоение
+    MARKER1 = '\x00'
+    result = result.replace('\\\\', MARKER1)
     result = result.replace('\\', '\\\\')
+    result = result.replace(MARKER1, '\\\\')
 
-    # Шаг 3: Восстанавливаем защищенные двойные слеши
-    result = result.replace(MARKER, '\\\\')
+    # Второе удвоение (теперь 1→2→4)
+    MARKER2 = '\x01'
+    result = result.replace('\\\\', MARKER2)
+    result = result.replace('\\', '\\\\')
+    result = result.replace(MARKER2, '\\\\')
 
     return result
 
