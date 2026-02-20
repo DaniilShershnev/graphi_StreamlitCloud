@@ -308,34 +308,20 @@ st.markdown("""
 
 # Функция для автоматического исправления LaTeX (одинарный слеш -> двойной)
 def fix_latex(equation_str):
-    """Автоматически исправляет одинарные слеши в LaTeX функциях на двойные"""
-    import re
-
+    """
+    Автоматически удваивает все обратные слеши в строке.
+    Преобразует \sin -> \\sin, \exp -> \\exp, и т.д.
+    """
     if not equation_str:
         return equation_str
 
-    # Список LaTeX функций и греческих букв
-    latex_patterns = [
-        'sin', 'cos', 'tan', 'cot', 'sec', 'csc',
-        'arcsin', 'arccos', 'arctan',
-        'sinh', 'cosh', 'tanh',
-        'exp', 'log', 'ln', 'lg',
-        'sqrt', 'frac',
-        'alpha', 'beta', 'betta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
-        'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho', 'sigma', 'tau',
-        'upsilon', 'phi', 'chi', 'psi', 'omega',
-        'Alpha', 'Beta', 'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma',
-        'Phi', 'Psi', 'Omega'
-    ]
-
-    result = equation_str
-
-    for pattern in latex_patterns:
-        # Регулярное выражение: находит \pattern, который НЕ предшествует еще одному \
-        # (?<!\\\\) - negative lookbehind, проверяет что перед \pattern нет еще одного \
-        regex = r'(?<!\\)\\' + pattern + r'\b'
-        # Заменяем на \\pattern
-        result = re.sub(regex, r'\\\\' + pattern, result)
+    # Простое решение: заменяем все одинарные \ на \\
+    # Сначала заменяем \\ на специальный маркер, чтобы не трогать уже двойные
+    result = equation_str.replace('\\\\', '###DOUBLE_BACKSLASH###')
+    # Теперь заменяем все одинарные \ на \\
+    result = result.replace('\\', '\\\\')
+    # Возвращаем маркеры обратно в \\
+    result = result.replace('###DOUBLE_BACKSLASH###', '\\\\')
 
     return result
 
