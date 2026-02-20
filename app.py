@@ -217,7 +217,7 @@ with st.sidebar:
 
     if st.session_state.graph_history:
         st.success(f"✅ Построено: {len(st.session_state.graph_history)}")
-        if st.button("🗑️ Очистить всё", use_container_width=True):
+        if st.button("🗑️ Очистить всё", width="stretch"):
             st.session_state.graph_history = []
             st.session_state.current_graph = None
             st.rerun()
@@ -245,7 +245,7 @@ if mode == "📚 Мои графики":
                         st.caption(f"🕐 {graph['timestamp']}")
 
                         if 'svg_data' in graph:
-                            st.image(graph['svg_data'], use_column_width=True)
+                            st.image(graph['svg_data'], width="stretch")
 
                             col_a, col_b = st.columns(2)
                             with col_a:
@@ -254,11 +254,11 @@ if mode == "📚 Мои графики":
                                     graph['svg_data'],
                                     file_name=f"{graph['name']}.svg",
                                     mime="image/svg+xml",
-                                    use_container_width=True,
+                                    width="stretch",
                                     key=f"dl_{i}_{j}"
                                 )
                             with col_b:
-                                if st.button("🗑️ Удалить", use_container_width=True, key=f"del_{i}_{j}"):
+                                if st.button("🗑️ Удалить", width="stretch", key=f"del_{i}_{j}"):
                                     st.session_state.graph_history.pop(i+j)
                                     st.rerun()
 
@@ -292,9 +292,9 @@ elif mode == "📁 Загрузить Excel":
             st.success(f"✅ Загружено строк: {len(df)}")
 
             with st.expander("👁️ Предпросмотр таблицы", expanded=True):
-                st.dataframe(df, use_container_width=True, height=300)
+                st.dataframe(df, width="stretch", height=300)
 
-            if st.button("🚀 Построить все графики", type="primary", use_container_width=True):
+            if st.button("🚀 Построить все графики", type="primary", width="stretch"):
                 progress = st.progress(0)
                 for idx in range(len(df)):
                     progress.progress((idx + 1) / len(df))
@@ -353,7 +353,7 @@ else:
         with col3:
             filename = st.text_input("Имя файла", value="function")
 
-        if st.button("🚀 Построить функцию", type="primary", use_container_width=True):
+        if st.button("🚀 Построить функцию", type="primary", width="stretch"):
             try:
                 with st.spinner("⏳ Построение..."):
                     plotter = FunctionPlotter(vars(params_global))
@@ -427,7 +427,7 @@ else:
             ylabel_ode = st.text_input("Y", value="значение", key="ylabel_ode")
             filename_ode = st.text_input("Файл", value="ode", key="file_ode")
 
-        if st.button("🚀 Построить ОДУ", type="primary", use_container_width=True):
+        if st.button("🚀 Построить ОДУ", type="primary", width="stretch"):
             try:
                 with st.spinner("⏳ Решение системы..."):
                     plotter = ODEPlotter(vars(params_global))
@@ -495,7 +495,7 @@ else:
             ylabel_pp = st.text_input("Ось Y", value="y", key="ylabel_pp")
             filename_pp = st.text_input("Файл", value="phase", key="file_pp")
 
-        if st.button("🚀 Построить портрет", type="primary", use_container_width=True):
+        if st.button("🚀 Построить портрет", type="primary", width="stretch"):
             try:
                 with st.spinner("⏳ Построение портрета..."):
                     plotter = ODEPlotter(vars(params_global))
@@ -543,7 +543,7 @@ if st.session_state.current_graph is not None and mode == "🎨 Построит
     col1, col2 = st.columns([4, 1])
 
     with col1:
-        st.image(st.session_state.current_graph, use_column_width=True)
+        st.image(st.session_state.current_graph, width="stretch")
 
     with col2:
         st.markdown("### Действия")
@@ -553,13 +553,13 @@ if st.session_state.current_graph is not None and mode == "🎨 Построит
             st.session_state.current_graph,
             file_name=f"graph_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
             mime="image/svg+xml",
-            use_container_width=True
+            width="stretch"
         )
 
-        if st.button("✅ Сохранено", use_container_width=True, disabled=True):
+        if st.button("✅ Сохранено", width="stretch", disabled=True):
             pass
 
-        if st.button("🔄 Построить новый", use_container_width=True):
+        if st.button("🔄 Построить новый", width="stretch"):
             st.session_state.current_graph = None
             st.rerun()
 
