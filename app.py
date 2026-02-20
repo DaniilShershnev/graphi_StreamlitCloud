@@ -430,13 +430,19 @@ elif mode == "Загрузить Excel":
                         else:
                             plotter = ODEPlotter(vars(params_global))
 
+                        # Определяем цветовую палитру для случая, если цвета не указаны
+                        default_colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF',
+                                        '#FFA500', '#800080', '#008000', '#000080', '#FF1493']
+
                         # Строим каждую кривую
-                        for row in rows:
+                        for curve_idx, row in enumerate(rows):
                             if graph_type == 'function':
                                 formula = row.get('formula', row.get('equation_1', 'x'))
                                 x_min = row.get('x_min', row.get('xlim_min', -10))
                                 x_max = row.get('x_max', row.get('xlim_max', 10))
-                                color = row.get('color', 'blue')
+
+                                # Получаем цвет из разных возможных колонок
+                                color = row.get('color') or row.get('Color') or row.get('col') or default_colors[curve_idx % len(default_colors)]
                                 linewidth = row.get('linewidth', 2.0)
 
                                 plotter.add_curve_from_latex(
@@ -472,19 +478,30 @@ elif mode == "Загрузить Excel":
                                     if param_name in row and row[param_name] is not None:
                                         params[param_name] = row[param_name]
 
-                                # Создаем стили для каждой переменной
-                                color = row.get('color', 'blue')
+                                # Получаем цвет из Excel (пробуем разные варианты названия колонки)
+                                color_raw = row.get('color') or row.get('Color') or row.get('col') or None
 
-                                # Маппинг цветов из текста в matplotlib colors
-                                color_map = {
-                                    'cyan': '#00FFFF',
-                                    'black': '#000000',
-                                    'green': '#00FF00',
-                                    'greer': '#00FF00',  # опечатка в Excel
-                                    'blue': '#0000FF',
-                                    'red': '#FF0000'
-                                }
-                                actual_color = color_map.get(str(color).lower(), color)
+                                # Если цвет не найден, используем цвет из палитры по индексу
+                                if not color_raw or str(color_raw).strip() == '':
+                                    actual_color = default_colors[curve_idx % len(default_colors)]
+                                else:
+                                    # Маппинг цветов из текста в matplotlib colors
+                                    color_map = {
+                                        'cyan': '#00FFFF',
+                                        'black': '#000000',
+                                        'green': '#00FF00',
+                                        'greer': '#00FF00',
+                                        'blue': '#0000FF',
+                                        'red': '#FF0000',
+                                        'orange': '#FFA500',
+                                        'purple': '#800080',
+                                        'yellow': '#FFFF00',
+                                        'pink': '#FF1493',
+                                        'brown': '#8B4513',
+                                        'gray': '#808080',
+                                        'grey': '#808080'
+                                    }
+                                    actual_color = color_map.get(str(color_raw).lower().strip(), str(color_raw))
 
                                 # Разные оттенки для s и w
                                 styles = [
