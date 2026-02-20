@@ -896,11 +896,13 @@ else:
                     eq1_fixed = fix_latex(eq1)
                     eq2_fixed = fix_latex(eq2)
 
-                    # Отладка: показываем что получилось после fix_latex
-                    st.write(f"DEBUG: eq1 original = `{eq1}`")
-                    st.write(f"DEBUG: eq1 fixed = `{eq1_fixed}`")
-                    st.write(f"DEBUG: eq2 original = `{eq2}`")
-                    st.write(f"DEBUG: eq2 fixed = `{eq2_fixed}`")
+                    # Отладка: показываем ТОЧНОЕ содержимое строк
+                    st.write(f"DEBUG: eq2 original visual = `{eq2}`")
+                    st.write(f"DEBUG: eq2 original repr = `{repr(eq2)}`")
+                    st.write(f"DEBUG: eq2 fixed visual = `{eq2_fixed}`")
+                    st.write(f"DEBUG: eq2 fixed repr = `{repr(eq2_fixed)}`")
+                    st.write(f"DEBUG: eq2 original has single backslash? {chr(92) in eq2}")
+                    st.write(f"DEBUG: eq2 original count of backslashes: {eq2.count(chr(92))}")
 
                     plotter = ODEPlotter(vars(params_global))
 
