@@ -503,10 +503,30 @@ elif mode == "Загрузить Excel":
                                     }
                                     actual_color = color_map.get(str(color_raw).lower().strip(), str(color_raw))
 
-                                # Разные оттенки для s и w
+                                # Получаем linestyle из Excel
+                                linestyle_raw = row.get('linestyle') or row.get('line_style') or row.get('ls') or '-'
+
+                                # Маппинг стилей линий
+                                linestyle_map = {
+                                    'solid': '-',
+                                    '-': '-',
+                                    'dashed': '--',
+                                    'dash': '--',
+                                    '--': '--',
+                                    'dotted': ':',
+                                    'dot': ':',
+                                    ':': ':',
+                                    'dashdot': '-.',
+                                    'dash-dot': '-.',
+                                    '-.': '-.'
+                                }
+                                actual_linestyle = linestyle_map.get(str(linestyle_raw).lower().strip(), '-')
+
+                                # ВАЖНО: Строим только переменную s (первую), w не строим
+                                # Для этого второй стиль ставим None
                                 styles = [
-                                    {"color": actual_color, "linewidth": 2.0},  # для s
-                                    {"color": actual_color, "linewidth": 1.0, "alpha": 0.5}  # для w (тоньше)
+                                    {"color": actual_color, "linewidth": 2.0, "linestyle": actual_linestyle},  # для s
+                                    None  # для w - НЕ строим
                                 ]
 
                                 plotter.solve_and_plot_time(
