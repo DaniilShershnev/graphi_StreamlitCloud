@@ -4,6 +4,7 @@ import os
 import tempfile
 import pandas as pd
 from datetime import datetime
+import base64
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -355,7 +356,11 @@ if mode == "Мои графики":
                         st.caption(f"Время: {graph['timestamp']}")
 
                         if 'svg_data' in graph:
-                            st.image(graph['svg_data'], width="stretch")
+                            svg_b64 = base64.b64encode(graph['svg_data']).decode()
+                            st.markdown(
+                                f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width: 100%; border-radius: 8px;">',
+                                unsafe_allow_html=True
+                            )
 
                             col_a, col_b = st.columns(2)
                             with col_a:
@@ -647,7 +652,11 @@ if st.session_state.current_graph is not None and mode == "Построить г
     col1, col2 = st.columns([4, 1])
 
     with col1:
-        st.image(st.session_state.current_graph, width="stretch")
+        svg_b64 = base64.b64encode(st.session_state.current_graph).decode()
+        st.markdown(
+            f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width: 100%; border-radius: 8px;">',
+            unsafe_allow_html=True
+        )
 
     with col2:
         st.markdown("**Действия**")
