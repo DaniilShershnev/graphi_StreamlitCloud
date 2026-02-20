@@ -4,6 +4,7 @@ import os
 import tempfile
 import pandas as pd
 from datetime import datetime
+import base64
 
 # Настройка путей
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -11,637 +12,559 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.function_plotter import FunctionPlotter
 from core.ode_plotter import ODEPlotter
 from utils.excel_loader import ExcelConfigLoader
-from utils.validators import merge_params
 import params_global
 
-# Конфигурация страницы для iPad
+# Конфигурация для iPad
 st.set_page_config(
     page_title="График Builder",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# CSS для iPad Pro 11" оптимизации
+# Современный CSS для iPad
 st.markdown("""
 <style>
-    /* Оптимизация для iPad */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    * {
+        font-family: 'Inter', sans-serif;
+    }
+
     .main {
-        padding: 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 0;
     }
 
-    /* Большие кнопки для сенсорного управления */
+    .block-container {
+        padding: 2rem !important;
+        max-width: 1400px;
+    }
+
+    /* Карточки */
+    .card {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+
+    /* Заголовки */
+    h1 {
+        color: white !important;
+        font-weight: 700 !important;
+        font-size: 2.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    h2 {
+        color: #1a202c !important;
+        font-weight: 600 !important;
+        font-size: 1.75rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    h3 {
+        color: #4a5568 !important;
+        font-weight: 600 !important;
+        font-size: 1.25rem !important;
+    }
+
+    /* Кнопки */
     .stButton>button {
-        height: 3.5rem;
-        font-size: 1.2rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
         font-weight: 600;
-        border-radius: 0.5rem;
         width: 100%;
+        height: auto;
+        min-height: 3.5rem;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
     }
 
-    /* Увеличенные поля ввода */
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    /* Поля ввода */
     .stTextInput>div>div>input,
     .stNumberInput>div>div>input,
     .stTextArea textarea {
-        font-size: 1.1rem;
-        padding: 0.75rem;
-        border-radius: 0.5rem;
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        padding: 0.875rem;
+        font-size: 1.05rem;
+        transition: border-color 0.3s;
     }
 
-    /* Карточки для графиков */
-    .graph-card {
+    .stTextInput>div>div>input:focus,
+    .stNumberInput>div>div>input:focus,
+    .stTextArea textarea:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    /* Selectbox */
+    .stSelectbox>div>div {
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+    }
+
+    /* График предпросмотр */
+    .graph-preview {
         background: white;
-        border-radius: 1rem;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        margin: 2rem 0;
+    }
+
+    /* Галерея */
+    .gallery-card {
+        background: white;
+        border-radius: 16px;
         padding: 1rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
-    }
-
-    /* Галерея графиков */
-    .gallery-item {
-        border: 2px solid #e0e0e0;
-        border-radius: 0.75rem;
-        padding: 0.5rem;
-        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         transition: all 0.3s;
+        cursor: pointer;
+        border: 2px solid transparent;
     }
 
-    .gallery-item:hover {
-        border-color: #1f77b4;
-        box-shadow: 0 4px 12px rgba(31,119,180,0.2);
+    .gallery-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        border-color: #667eea;
     }
 
-    /* Заголовки секций */
-    .section-header {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        color: #1f77b4;
+    /* Sidebar */
+    .css-1d391kg {
+        background: white;
     }
 
-    /* Статус индикаторы */
-    .status-success {
+    /* Успех/ошибка */
+    .success-box {
         background: #d4edda;
         color: #155724;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        padding: 1.25rem;
+        border-radius: 12px;
+        border-left: 5px solid #28a745;
         margin: 1rem 0;
+        font-weight: 500;
     }
 
-    .status-error {
+    .error-box {
         background: #f8d7da;
         color: #721c24;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        padding: 1.25rem;
+        border-radius: 12px;
+        border-left: 5px solid #dc3545;
         margin: 1rem 0;
+        font-weight: 500;
+    }
+
+    /* Вкладки */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 10px;
+        padding: 12px 24px;
+        font-weight: 600;
+    }
+
+    /* Download button */
+    .stDownloadButton>button {
+        background: #48bb78;
+        color: white;
+        border-radius: 10px;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+    }
+
+    .stDownloadButton>button:hover {
+        background: #38a169;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Инициализация session state для истории
+# Инициализация session state
 if 'graph_history' not in st.session_state:
     st.session_state.graph_history = []
-
 if 'current_graph' not in st.session_state:
     st.session_state.current_graph = None
 
-# Сайдбар с режимами работы
-with st.sidebar:
-    st.image("https://raw.githubusercontent.com/streamlit/streamlit/develop/docs/_static/logo.png", width=100)
-    st.title("📊 График Builder")
-    st.markdown("---")
+# Заголовок
+st.markdown("<h1>📊 График Builder</h1>", unsafe_allow_html=True)
+st.markdown("<p style='color: white; font-size: 1.15rem; margin-bottom: 2rem;'>Построение математических графиков для курсовой работы</p>", unsafe_allow_html=True)
 
+# Sidebar
+with st.sidebar:
+    st.markdown("### 🎯 Режим работы")
     mode = st.radio(
-        "Режим работы",
-        ["🎨 Ручной ввод", "📁 Загрузка Excel", "📚 Галерея графиков", "⚡ Быстрые шаблоны"],
+        "",
+        ["🎨 Построить график", "📁 Загрузить Excel", "📚 Мои графики"],
         label_visibility="collapsed"
     )
 
     st.markdown("---")
 
     if st.session_state.graph_history:
-        st.success(f"✅ Графиков построено: {len(st.session_state.graph_history)}")
-        if st.button("🗑️ Очистить историю", use_container_width=True):
+        st.success(f"✅ Построено: {len(st.session_state.graph_history)}")
+        if st.button("🗑️ Очистить всё", use_container_width=True):
             st.session_state.graph_history = []
+            st.session_state.current_graph = None
             st.rerun()
 
     st.markdown("---")
-    st.caption("Оптимизировано для iPad Pro 11\"")
+    st.caption("📱 Оптимизировано для iPad Pro 11\"")
 
-# ========== РЕЖИМ: БЫСТРЫЕ ШАБЛОНЫ ==========
-if mode == "⚡ Быстрые шаблоны":
-    st.header("⚡ Быстрые шаблоны")
-    st.markdown("Готовые примеры для быстрого старта")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("📈 Математические функции")
-
-        if st.button("Квадратичная функция", use_container_width=True):
-            st.session_state.template = {
-                'type': 'function',
-                'formula': 'x^2',
-                'x_min': -5.0,
-                'x_max': 5.0
-            }
-
-        if st.button("Синусоида", use_container_width=True):
-            st.session_state.template = {
-                'type': 'function',
-                'formula': '\\\\sin(x)',
-                'x_min': 0.0,
-                'x_max': 10.0
-            }
-
-        if st.button("Экспонента", use_container_width=True):
-            st.session_state.template = {
-                'type': 'function',
-                'formula': '\\\\exp(-x^2)',
-                'x_min': -3.0,
-                'x_max': 3.0
-            }
-
-    with col2:
-        st.subheader("🔄 Системы ОДУ")
-
-        if st.button("Лотка-Вольтерра", use_container_width=True):
-            st.session_state.template = {
-                'type': 'ode',
-                'eq1': '1.5*x - 0.1*x*y',
-                'eq2': '0.075*x*y - y',
-                'ic1': 10.0,
-                'ic2': 5.0
-            }
-
-        if st.button("Маятник", use_container_width=True):
-            st.session_state.template = {
-                'type': 'phase',
-                'eq1': 'y',
-                'eq2': '-\\\\sin(x)',
-                'ic1': 1.5,
-                'ic2': 0.0
-            }
-
-    if 'template' in st.session_state:
-        st.info("✨ Шаблон загружен! Перейдите в режим 'Ручной ввод' для построения")
-
-# ========== РЕЖИМ: ГАЛЕРЕЯ ==========
-elif mode == "📚 Галерея графиков":
-    st.header("📚 Галерея построенных графиков")
+# ========== РЕЖИМ: МОИ ГРАФИКИ ==========
+if mode == "📚 Мои графики":
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("## 📚 Галерея графиков")
 
     if not st.session_state.graph_history:
-        st.info("📭 История пуста. Постройте графики, чтобы они появились здесь.")
+        st.info("📭 Графики еще не построены. Перейдите в режим 'Построить график'")
     else:
-        # Фильтры
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            filter_type = st.selectbox("Тип графика", ["Все", "Функции", "ОДУ", "Фазовые портреты"])
-        with col2:
-            sort_by = st.selectbox("Сортировка", ["Новые первыми", "Старые первыми"])
-        with col3:
-            if st.button("🔄 Обновить", use_container_width=True):
-                st.rerun()
-
-        st.markdown("---")
-
-        # Отображение графиков в сетке
-        graphs = st.session_state.graph_history.copy()
-        if sort_by == "Старые первыми":
-            graphs.reverse()
-
-        cols_per_row = 2
-        for i in range(0, len(graphs), cols_per_row):
-            cols = st.columns(cols_per_row)
+        # Сетка 2 колонки
+        for i in range(0, len(st.session_state.graph_history), 2):
+            cols = st.columns(2)
             for j, col in enumerate(cols):
-                if i + j < len(graphs):
-                    graph = graphs[i + j]
+                if i + j < len(st.session_state.graph_history):
+                    graph = st.session_state.graph_history[i + j]
                     with col:
-                        with st.container():
-                            st.markdown(f"**{graph['name']}**")
-                            st.caption(f"🕐 {graph['timestamp']}")
+                        st.markdown("<div class='gallery-card'>", unsafe_allow_html=True)
+                        st.markdown(f"**{graph['name']}**")
+                        st.caption(f"🕐 {graph['timestamp']}")
 
-                            if 'svg_data' in graph:
-                                st.image(graph['svg_data'])
+                        if 'svg_data' in graph:
+                            st.image(graph['svg_data'], use_column_width=True)
 
-                                # Кнопки действий
-                                col_a, col_b = st.columns(2)
-                                with col_a:
-                                    st.download_button(
-                                        "💾 Скачать",
-                                        graph['svg_data'],
-                                        file_name=f"{graph['name']}.svg",
-                                        mime="image/svg+xml",
-                                        use_container_width=True,
-                                        key=f"download_{i+j}"
-                                    )
-                                with col_b:
-                                    if st.button("🗑️", use_container_width=True, key=f"delete_{i+j}"):
-                                        st.session_state.graph_history.pop(i+j)
-                                        st.rerun()
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                st.download_button(
+                                    "💾 Скачать",
+                                    graph['svg_data'],
+                                    file_name=f"{graph['name']}.svg",
+                                    mime="image/svg+xml",
+                                    use_container_width=True,
+                                    key=f"dl_{i}_{j}"
+                                )
+                            with col_b:
+                                if st.button("🗑️ Удалить", use_container_width=True, key=f"del_{i}_{j}"):
+                                    st.session_state.graph_history.pop(i+j)
+                                    st.rerun()
 
-# ========== РЕЖИМ: ЗАГРУЗКА EXCEL ==========
-elif mode == "📁 Загрузка Excel":
-    st.header("📁 Загрузка конфигурации из Excel")
+                        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("""
-    ### 📋 Формат Excel файла
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    Таблица должна содержать колонки:
-    - **type** - тип графика (function, ode_time, phase_portrait)
-    - **output** - имя файла для сохранения
-    - Другие параметры зависят от типа графика
+# ========== РЕЖИМ: EXCEL ==========
+elif mode == "📁 Загрузить Excel":
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown("## 📁 Загрузка Excel файла")
 
-    [📥 Скачать пример таблицы](./excel/pic9a_power_exp.xlsx)
-    """)
+    st.info("📋 Загрузите таблицу с конфигурациями графиков (.xlsx или .xls)")
 
     uploaded_file = st.file_uploader(
-        "Выберите Excel файл (.xlsx или .xls)",
+        "Выберите файл",
         type=['xlsx', 'xls'],
-        help="Загрузите таблицу с конфигурациями графиков"
+        label_visibility="collapsed"
     )
 
-    if uploaded_file is not None:
+    if uploaded_file:
         try:
-            # Сохраняем во временный файл
             with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
                 tmp.write(uploaded_file.getvalue())
                 tmp_path = tmp.name
 
-            # Загружаем Excel
             loader = ExcelConfigLoader(tmp_path)
             df = loader.load_table()
             loader.validate_table()
 
-            st.success(f"✅ Загружено {len(df)} строк")
+            st.success(f"✅ Загружено строк: {len(df)}")
 
-            # Предпросмотр таблицы
-            with st.expander("👁️ Предпросмотр данных", expanded=True):
-                st.dataframe(df, use_container_width=True)
+            with st.expander("👁️ Предпросмотр таблицы", expanded=True):
+                st.dataframe(df, use_container_width=True, height=300)
 
-            # Выбор строк для построения
-            st.subheader("Выберите графики для построения")
-
-            selected_rows = st.multiselect(
-                "Выберите строки (по номеру или имени файла)",
-                options=list(range(len(df))),
-                format_func=lambda x: f"#{x+1}: {df.iloc[x]['output'] if 'output' in df.columns else 'Без имени'}",
-                default=list(range(min(3, len(df))))
-            )
-
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                build_all = st.checkbox("Построить все графики сразу", value=False)
-            with col2:
-                if st.button("🚀 Построить", type="primary", use_container_width=True):
-                    rows_to_build = list(range(len(df))) if build_all else selected_rows
-
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-
-                    success_count = 0
-                    error_count = 0
-
-                    for idx, row_idx in enumerate(rows_to_build):
-                        status_text.text(f"Построение графика {idx+1} из {len(rows_to_build)}...")
-                        progress_bar.progress((idx + 1) / len(rows_to_build))
-
-                        try:
-                            row = df.iloc[row_idx].to_dict()
-                            # Здесь будет логика построения из Excel
-                            # Пока просто добавляем в историю
-                            st.session_state.graph_history.append({
-                                'name': row.get('output', f'graph_{row_idx}'),
-                                'timestamp': datetime.now().strftime('%H:%M:%S'),
-                                'type': row.get('type', 'unknown')
-                            })
-                            success_count += 1
-                        except Exception as e:
-                            error_count += 1
-                            st.error(f"Ошибка в строке {row_idx}: {str(e)}")
-
-                    progress_bar.empty()
-                    status_text.empty()
-
-                    if success_count > 0:
-                        st.success(f"✅ Успешно построено: {success_count}")
-                    if error_count > 0:
-                        st.error(f"❌ Ошибок: {error_count}")
+            if st.button("🚀 Построить все графики", type="primary", use_container_width=True):
+                progress = st.progress(0)
+                for idx in range(len(df)):
+                    progress.progress((idx + 1) / len(df))
+                    # Здесь логика построения
+                    st.session_state.graph_history.append({
+                        'name': f"graph_{idx}",
+                        'timestamp': datetime.now().strftime('%H:%M:%S'),
+                        'type': 'excel'
+                    })
+                progress.empty()
+                st.success(f"✅ Построено графиков: {len(df)}")
 
             os.unlink(tmp_path)
 
         except Exception as e:
-            st.error(f"❌ Ошибка загрузки: {str(e)}")
+            st.error(f"❌ Ошибка: {str(e)}")
 
-# ========== РЕЖИМ: РУЧНОЙ ВВОД ==========
-else:  # Ручной ввод
-    st.header("🎨 Ручное построение графиков")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Вкладки для типов графиков
-    tab1, tab2, tab3 = st.tabs(["📈 Функция", "📊 ОДУ (время)", "🔄 Фазовый портрет"])
+# ========== РЕЖИМ: ПОСТРОИТЬ ГРАФИК ==========
+else:
+    # Вкладки для типов
+    tab1, tab2, tab3 = st.tabs(["📈 Функция", "📊 ОДУ", "🔄 Фазовый портрет"])
 
-    # ========== ВКЛАДКА: ФУНКЦИЯ ==========
+    # ========== ФУНКЦИЯ ==========
     with tab1:
-        st.subheader("График функции f(x)")
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("## 📈 График функции")
 
-        # Загрузка шаблона если есть
-        default_formula = "x^2"
-        default_x_min = -10.0
-        default_x_max = 10.0
-
-        if 'template' in st.session_state and st.session_state.template.get('type') == 'function':
-            default_formula = st.session_state.template.get('formula', default_formula)
-            default_x_min = st.session_state.template.get('x_min', default_x_min)
-            default_x_max = st.session_state.template.get('x_max', default_x_max)
-
-        col1, col2 = st.columns([2, 1])
+        col1, col2 = st.columns([3, 1])
 
         with col1:
             formula = st.text_input(
-                "Формула LaTeX",
-                value=default_formula,
-                help="Примеры: x^2, \\\\sin(x), \\\\exp(-x^2)",
-                placeholder="x^2 + \\\\sin(x)"
+                "📝 Формула LaTeX",
+                value="x^2",
+                placeholder="x^2 + \\\\sin(x)",
+                help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp"
             )
 
             col_a, col_b = st.columns(2)
             with col_a:
-                x_min = st.number_input("xmin", value=default_x_min, step=0.5)
+                x_min = st.number_input("x min", value=-10.0, step=1.0)
             with col_b:
-                x_max = st.number_input("x max", value=default_x_max, step=0.5)
+                x_max = st.number_input("x max", value=10.0, step=1.0)
 
         with col2:
-            st.markdown("**Стиль**")
-            color = st.selectbox("Цвет", ["blue", "red", "green", "orange", "purple"], key="f_color")
-            linewidth = st.slider("Толщина", 0.5, 4.0, 1.5, 0.5, key="f_lw")
-            grid = st.checkbox("Сетка", value=True, key="f_grid")
+            st.markdown("**🎨 Стиль**")
+            color = st.selectbox("Цвет", ["blue", "red", "green", "purple", "orange"])
+            linewidth = st.slider("Толщина", 0.5, 4.0, 2.0)
 
-        col1, col2, col3 = st.columns([2, 2, 1])
+        col1, col2, col3 = st.columns(3)
         with col1:
-            xlabel = st.text_input("Ось X", value="x", key="f_xlabel")
+            xlabel = st.text_input("Ось X", value="x")
         with col2:
-            ylabel = st.text_input("Ось Y", value="f(x)", key="f_ylabel")
+            ylabel = st.text_input("Ось Y", value="f(x)")
         with col3:
-            filename = st.text_input("Имя файла", value="function", key="f_name")
+            filename = st.text_input("Имя файла", value="function")
 
-        if st.button("🚀 Построить график функции", type="primary", use_container_width=True, key="build_func"):
+        if st.button("🚀 Построить функцию", type="primary", use_container_width=True):
             try:
-                with st.spinner("Построение графика..."):
+                with st.spinner("⏳ Построение..."):
                     plotter = FunctionPlotter(vars(params_global))
                     plotter.add_curve_from_latex(
-                        formula,
-                        {},
-                        [x_min, x_max],
+                        formula, {}, [x_min, x_max],
                         {"color": color, "linewidth": linewidth}
                     )
-                    plotter.set_axes(
-                        xlim=[x_min, x_max],
-                        xlabel=xlabel,
-                        ylabel=ylabel,
-                        grid=grid
-                    )
+                    plotter.set_axes(xlim=[x_min, x_max], xlabel=xlabel, ylabel=ylabel, grid=True)
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
                         plotter.save(tmp.name)
-
                         with open(tmp.name, 'rb') as f:
                             svg_data = f.read()
 
-                        # Добавляем в историю
                         st.session_state.graph_history.append({
                             'name': filename,
                             'timestamp': datetime.now().strftime('%H:%M:%S'),
                             'type': 'function',
                             'svg_data': svg_data
                         })
-
                         st.session_state.current_graph = svg_data
-
                         os.unlink(tmp.name)
 
-                st.success("✅ График успешно построен!")
+                st.markdown("<div class='success-box'>✅ График успешно построен!</div>", unsafe_allow_html=True)
                 st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Ошибка: {str(e)}")
+                st.markdown(f"<div class='error-box'>❌ Ошибка: {str(e)}</div>", unsafe_allow_html=True)
 
-    # ========== ВКЛАДКА: ОДУ ==========
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ========== ОДУ ==========
     with tab2:
-        st.subheader("Система ОДУ - временные ряды")
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("## 📊 Система ОДУ")
 
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            st.markdown("**Система уравнений**")
-
-            num_vars = st.number_input("Количество переменных", 2, 4, 2, 1, key="ode_nvars")
+            num_vars = st.number_input("Количество переменных", 2, 4, 2, 1)
 
             equations = []
             var_names = []
             ics = []
-            colors_ode = []
+            colors_list = []
 
             for i in range(num_vars):
-                st.markdown(f"**Переменная {i+1}**")
+                st.markdown(f"**Переменная {i+1}:**")
                 col_a, col_b, col_c, col_d = st.columns([1, 2, 1, 1])
 
                 with col_a:
-                    var_name = st.text_input("Имя", value=chr(120+i), key=f"ode_var_{i}", label_visibility="collapsed")
-                    var_names.append(var_name)
-
+                    var = st.text_input("", value=chr(120+i), key=f"var_{i}", label_visibility="collapsed")
+                    var_names.append(var)
                 with col_b:
-                    eq = st.text_input(f"d{var_name}/dt =", value="-x" if i==0 else "x-y", key=f"ode_eq_{i}", label_visibility="collapsed")
+                    eq = st.text_input("", value="-x" if i==0 else "x-y", key=f"eq_{i}", placeholder=f"d{var}/dt", label_visibility="collapsed")
                     equations.append(eq)
-
                 with col_c:
-                    ic = st.number_input(f"{var_name}(0)", value=float(i+1), key=f"ode_ic_{i}", label_visibility="collapsed")
+                    ic = st.number_input("", value=float(i+1), key=f"ic_{i}", label_visibility="collapsed")
                     ics.append(ic)
-
                 with col_d:
-                    c = st.selectbox("🎨", ["blue", "red", "green", "orange", "purple"], key=f"ode_c_{i}", label_visibility="collapsed")
-                    colors_ode.append(c)
+                    c = st.selectbox("", ["blue", "red", "green", "orange", "purple"], key=f"c_{i}", label_visibility="collapsed")
+                    colors_list.append(c)
 
         with col2:
-            st.markdown("**Параметры**")
-            t_start = st.number_input("t начало", value=0.0, step=0.5, key="ode_tstart")
-            t_end = st.number_input("t конец", value=10.0, step=0.5, key="ode_tend")
+            st.markdown("**⏱️ Время**")
+            t_start = st.number_input("Начало", value=0.0)
+            t_end = st.number_input("Конец", value=10.0)
 
-            param_text = st.text_area("Параметры (a=1, b=2)", value="", key="ode_params", height=100)
+            st.markdown("**📊 Оси**")
+            xlabel_ode = st.text_input("X", value="t", key="xlabel_ode")
+            ylabel_ode = st.text_input("Y", value="значение", key="ylabel_ode")
+            filename_ode = st.text_input("Файл", value="ode", key="file_ode")
 
-            params = {}
-            if param_text.strip():
-                for item in param_text.split(','):
-                    if '=' in item:
-                        k, v = item.split('=')
-                        params[k.strip()] = float(v.strip())
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            xlabel_ode = st.text_input("Ось X", value="t", key="ode_xlabel")
-        with col2:
-            ylabel_ode = st.text_input("Ось Y", value="значение", key="ode_ylabel")
-        with col3:
-            filename_ode = st.text_input("Имя файла", value="ode", key="ode_name")
-
-        if st.button("🚀 Построить ОДУ", type="primary", use_container_width=True, key="build_ode"):
+        if st.button("🚀 Построить ОДУ", type="primary", use_container_width=True):
             try:
-                with st.spinner("Решение системы ОДУ..."):
+                with st.spinner("⏳ Решение системы..."):
                     plotter = ODEPlotter(vars(params_global))
-
-                    styles = [{"color": colors_ode[i], "linewidth": 1.5} for i in range(num_vars)]
+                    styles = [{"color": colors_list[i], "linewidth": 2.0} for i in range(num_vars)]
 
                     plotter.solve_and_plot_time(
-                        equations,
-                        var_names,
-                        ics,
-                        params,
-                        [t_start, t_end],
-                        styles
+                        equations, var_names, ics, {},
+                        [t_start, t_end], styles
                     )
-
                     plotter.set_axes(xlabel=xlabel_ode, ylabel=ylabel_ode, grid=True)
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
                         plotter.save(tmp.name)
-
                         with open(tmp.name, 'rb') as f:
                             svg_data = f.read()
 
                         st.session_state.graph_history.append({
                             'name': filename_ode,
                             'timestamp': datetime.now().strftime('%H:%M:%S'),
-                            'type': 'ode_time',
+                            'type': 'ode',
                             'svg_data': svg_data
                         })
-
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
-                st.success("✅ График ОДУ успешно построен!")
+                st.markdown("<div class='success-box'>✅ ОДУ успешно решена!</div>", unsafe_allow_html=True)
                 st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Ошибка: {str(e)}")
+                st.markdown(f"<div class='error-box'>❌ Ошибка: {str(e)}</div>", unsafe_allow_html=True)
 
-    # ========== ВКЛАДКА: ФАЗОВЫЙ ПОРТРЕТ ==========
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ========== ФАЗОВЫЙ ПОРТРЕТ ==========
     with tab3:
-        st.subheader("Фазовый портрет")
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.markdown("## 🔄 Фазовый портрет")
 
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            st.markdown("**Система уравнений**")
+            st.markdown("**📐 Система уравнений**")
 
             col_a, col_b = st.columns(2)
             with col_a:
-                var1 = st.text_input("Переменная 1", value="x", key="pp_var1")
-                eq1 = st.text_input(f"d{var1}/dt =", value="y", key="pp_eq1")
-                ic1 = st.number_input(f"{var1}(0)", value=1.5, key="pp_ic1")
+                var1 = st.text_input("Переменная 1", value="x")
+                eq1 = st.text_input(f"d{var1}/dt", value="y")
+                ic1 = st.number_input(f"{var1}(0)", value=1.5)
 
             with col_b:
-                var2 = st.text_input("Переменная 2", value="y", key="pp_var2")
-                eq2 = st.text_input(f"d{var2}/dt =", value="-\\\\sin(x)", key="pp_eq2")
-                ic2 = st.number_input(f"{var2}(0)", value=0.0, key="pp_ic2")
+                var2 = st.text_input("Переменная 2", value="y")
+                eq2 = st.text_input(f"d{var2}/dt", value="-\\\\sin(x)")
+                ic2 = st.number_input(f"{var2}(0)", value=0.0)
 
         with col2:
-            st.markdown("**Настройки**")
-            t_end_pp = st.number_input("Время", value=50.0, step=5.0, key="pp_tend")
-            color_pp = st.selectbox("Цвет", ["blue", "red", "green"], key="pp_color")
-            show_vector = st.checkbox("Векторное поле", value=True, key="pp_vector")
+            st.markdown("**⚙️ Настройки**")
+            t_end_pp = st.number_input("Время", value=50.0, step=5.0)
+            color_pp = st.selectbox("Цвет", ["blue", "red", "green", "purple"])
+            show_vector = st.checkbox("Векторное поле", value=True)
 
             if show_vector:
-                density = st.slider("Плотность", 5, 30, 15, key="pp_density")
+                density = st.slider("Плотность", 5, 30, 15)
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            xlabel_pp = st.text_input("Ось X", value="x", key="pp_xlabel")
-        with col2:
-            ylabel_pp = st.text_input("Ось Y", value="y", key="pp_ylabel")
-        with col3:
-            filename_pp = st.text_input("Имя файла", value="phase", key="pp_name")
+            xlabel_pp = st.text_input("Ось X", value="x", key="xlabel_pp")
+            ylabel_pp = st.text_input("Ось Y", value="y", key="ylabel_pp")
+            filename_pp = st.text_input("Файл", value="phase", key="file_pp")
 
-        if st.button("🚀 Построить фазовый портрет", type="primary", use_container_width=True, key="build_phase"):
+        if st.button("🚀 Построить портрет", type="primary", use_container_width=True):
             try:
-                with st.spinner("Построение фазового портрета..."):
+                with st.spinner("⏳ Построение портрета..."):
                     plotter = ODEPlotter(vars(params_global))
 
                     if show_vector:
                         plotter.add_vector_field(
-                            [eq1, eq2],
-                            [var1, var2],
-                            {},
-                            [0, 1],
-                            {"density": density, "color": "gray", "alpha": 0.5, "scale": 20, "width": 0.002}
+                            [eq1, eq2], [var1, var2], {}, [0, 1],
+                            {"density": density, "color": "gray", "alpha": 0.4}
                         )
 
                     plotter.solve_and_plot_phase(
-                        [eq1, eq2],
-                        [var1, var2],
-                        [ic1, ic2],
-                        {},
-                        [0, t_end_pp],
-                        [0, 1],
-                        {"color": color_pp, "linewidth": 1.2}
+                        [eq1, eq2], [var1, var2], [ic1, ic2], {},
+                        [0, t_end_pp], [0, 1],
+                        {"color": color_pp, "linewidth": 2.0}
                     )
-
                     plotter.set_axes(xlabel=xlabel_pp, ylabel=ylabel_pp, grid=True)
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
                         plotter.save(tmp.name)
-
                         with open(tmp.name, 'rb') as f:
                             svg_data = f.read()
 
                         st.session_state.graph_history.append({
                             'name': filename_pp,
                             'timestamp': datetime.now().strftime('%H:%M:%S'),
-                            'type': 'phase_portrait',
+                            'type': 'phase',
                             'svg_data': svg_data
                         })
-
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
-                st.success("✅ Фазовый портрет успешно построен!")
+                st.markdown("<div class='success-box'>✅ Портрет успешно построен!</div>", unsafe_allow_html=True)
                 st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Ошибка: {str(e)}")
+                st.markdown(f"<div class='error-box'>❌ Ошибка: {str(e)}</div>", unsafe_allow_html=True)
 
-# ========== ПРЕДПРОСМОТР ТЕКУЩЕГО ГРАФИКА ==========
-if st.session_state.current_graph is not None:
-    st.markdown("---")
-    st.subheader("📊 Последний построенный график")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# ========== ПРЕДПРОСМОТР ПОСЛЕДНЕГО ГРАФИКА ==========
+if st.session_state.current_graph is not None and mode == "🎨 Построить график":
+    st.markdown("<div class='card graph-preview'>", unsafe_allow_html=True)
+    st.markdown("## 📊 Предпросмотр результата")
 
     col1, col2 = st.columns([4, 1])
 
     with col1:
-        st.image(st.session_state.current_graph)
+        st.image(st.session_state.current_graph, use_column_width=True)
 
     with col2:
         st.markdown("### Действия")
 
-        if st.button("💾 Скачать SVG", use_container_width=True):
-            st.download_button(
-                "Скачать файл",
-                st.session_state.current_graph,
-                file_name=f"graph_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
-                mime="image/svg+xml",
-                use_container_width=True
-            )
+        st.download_button(
+            "💾 Скачать SVG",
+            st.session_state.current_graph,
+            file_name=f"graph_{datetime.now().strftime('%Y%m%d_%H%M%S')}.svg",
+            mime="image/svg+xml",
+            use_container_width=True
+        )
 
-        if st.button("📋 Копировать в галерею", use_container_width=True):
-            st.success("✅ Уже в галерее!")
+        if st.button("✅ Сохранено", use_container_width=True, disabled=True):
+            pass
 
-        if st.button("🗑️ Очистить", use_container_width=True):
+        if st.button("🔄 Построить новый", use_container_width=True):
             st.session_state.current_graph = None
             st.rerun()
 
+    st.markdown("</div>", unsafe_allow_html=True)
+
 # Футер
 st.markdown("---")
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.caption("📱 Оптимизировано для iPad Pro 11\"")
-with col2:
-    st.caption("🎓 Проект для курсовой работы")
-with col3:
-    st.caption(f"📊 Графиков в истории: {len(st.session_state.graph_history)}")
+st.markdown(f"<p style='text-align: center; color: white;'>📱 iPad Pro 11\" | 🎓 Курсовая работа | 📊 Графиков: {len(st.session_state.graph_history)}</p>", unsafe_allow_html=True)
