@@ -430,6 +430,18 @@ elif mode == "Загрузить Excel":
                         else:
                             plotter = ODEPlotter(vars(params_global))
 
+                            # Проверяем, нужны ли две оси Y
+                            dual_y = first_row.get('dual_y_axis') or first_row.get('dual_y') or first_row.get('two_axes')
+                            if dual_y:
+                                # Преобразуем в bool
+                                if isinstance(dual_y, str):
+                                    dual_y = dual_y.lower() in ('true', 'yes', '1', 'да')
+                                else:
+                                    dual_y = bool(dual_y)
+
+                                if dual_y:
+                                    plotter.enable_dual_y_axis()
+
                         # Определяем цветовую палитру для случая, если цвета не указаны
                         default_colors = ['#FF0000', '#00FF00', '#0000FF', '#FF00FF', '#00FFFF',
                                         '#FFA500', '#800080', '#008000', '#000080', '#FF1493']
@@ -522,12 +534,25 @@ elif mode == "Загрузить Excel":
                                 }
                                 actual_linestyle = linestyle_map.get(str(linestyle_raw).lower().strip(), '-')
 
-                                # ВАЖНО: Строим только переменную s (первую), w не строим
-                                # Для этого второй стиль ставим None
-                                styles = [
-                                    {"color": actual_color, "linewidth": 2.0, "linestyle": actual_linestyle},  # для s
-                                    None  # для w - НЕ строим
-                                ]
+                                # Проверяем, используется ли dual_y_axis
+                                use_dual_y = first_row.get('dual_y_axis') or first_row.get('dual_y') or first_row.get('two_axes')
+                                if isinstance(use_dual_y, str):
+                                    use_dual_y = use_dual_y.lower() in ('true', 'yes', '1', 'да')
+                                else:
+                                    use_dual_y = bool(use_dual_y) if use_dual_y else False
+
+                                if use_dual_y:
+                                    # Две оси: s на левой (синий), w на правой (красный)
+                                    styles = [
+                                        {"color": actual_color, "linewidth": 2.0, "linestyle": actual_linestyle},  # s на левой оси
+                                        {"color": 'red', "linewidth": 1.5, "linestyle": ':', "axis": "right"}  # w на правой оси
+                                    ]
+                                else:
+                                    # Одна ось: строим только s, w не строим
+                                    styles = [
+                                        {"color": actual_color, "linewidth": 2.0, "linestyle": actual_linestyle},  # для s
+                                        None  # для w - НЕ строим
+                                    ]
 
                                 plotter.solve_and_plot_time(
                                     equations, var_names, ics, params,
@@ -537,7 +562,25 @@ elif mode == "Загрузить Excel":
                         # Настраиваем оси
                         xlabel = first_row.get('xlabel', 't')
                         ylabel = first_row.get('ylabel', 'value')
-                        plotter.set_axes(xlabel=xlabel, ylabel=ylabel, grid=True)
+
+                        # Проверяем dual_y_axis для настройки осей
+                        use_dual_y = first_row.get('dual_y_axis') or first_row.get('dual_y') or first_row.get('two_axes')
+                        if isinstance(use_dual_y, str):
+                            use_dual_y = use_dual_y.lower() in ('true', 'yes', '1', 'да')
+                        else:
+                            use_dual_y = bool(use_dual_y) if use_dual_y else False
+
+                        if use_dual_y and graph_type == 'ode_time':
+                            ylabel_right = first_row.get('ylabel_right', 'w')
+                            plotter.set_axes(
+                                xlabel=xlabel,
+                                ylabel=ylabel if ylabel != 'value' else 's',
+                                ylabel_right=ylabel_right,
+                                dual_y_axis=True,
+                                grid=True
+                            )
+                        else:
+                            plotter.set_axes(xlabel=xlabel, ylabel=ylabel, grid=True)
 
                         # Сохраняем в SVG
                         with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
@@ -679,21 +722,52 @@ else:
             t_end = st.number_input("Конец", value=10.0)
 
             st.markdown("**Оси**")
+            use_dual_y_manual = st.checkbox("Две оси Y", value=False, key="dual_y_manual",
+                                           help="Первая переменная на левой оси, вторая на правой")
             xlabel_ode = st.text_input("X", value="t", key="xlabel_ode")
-            ylabel_ode = st.text_input("Y", value="значение", key="ylabel_ode")
+            ylabel_ode = st.text_input("Y левая", value="значение", key="ylabel_ode")
+            if use_dual_y_manual:
+                ylabel_right_ode = st.text_input("Y правая", value="значение 2", key="ylabel_right_ode")
             filename_ode = st.text_input("Файл", value="ode", key="file_ode")
 
         if st.button("Построить", type="primary", width="stretch", key="build_ode"):
             try:
                 with st.spinner("Решение системы ОДУ..."):
                     plotter = ODEPlotter(vars(params_global))
-                    styles = [{"color": colors_list[i], "linewidth": 2.0} for i in range(num_vars)]
+
+                    # Если используются две оси, включаем dual_y_axis
+                    if use_dual_y_manual:
+                        plotter.enable_dual_y_axis()
+
+                    # Создаем стили с учетом dual_y_axis
+                    if use_dual_y_manual and num_vars >= 2:
+                        # Первая переменная на левой оси, вторая на правой
+                        styles = [
+                            {"color": colors_list[0], "linewidth": 2.0},
+                            {"color": colors_list[1], "linewidth": 2.0, "axis": "right"}
+                        ]
+                        # Остальные переменные на левой оси
+                        for i in range(2, num_vars):
+                            styles.append({"color": colors_list[i], "linewidth": 1.5, "linestyle": "--"})
+                    else:
+                        styles = [{"color": colors_list[i], "linewidth": 2.0} for i in range(num_vars)]
 
                     plotter.solve_and_plot_time(
                         equations, var_names, ics, {},
                         [t_start, t_end], styles
                     )
-                    plotter.set_axes(xlabel=xlabel_ode, ylabel=ylabel_ode, grid=True)
+
+                    # Настраиваем оси с учетом dual_y_axis
+                    if use_dual_y_manual and num_vars >= 2:
+                        plotter.set_axes(
+                            xlabel=xlabel_ode,
+                            ylabel=ylabel_ode,
+                            ylabel_right=ylabel_right_ode,
+                            dual_y_axis=True,
+                            grid=True
+                        )
+                    else:
+                        plotter.set_axes(xlabel=xlabel_ode, ylabel=ylabel_ode, grid=True)
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
                         plotter.save(tmp.name)
