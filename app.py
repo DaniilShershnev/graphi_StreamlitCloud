@@ -309,18 +309,33 @@ st.markdown("""
 # Функция для автоматического исправления LaTeX (одинарный слеш -> двойной)
 def fix_latex(equation_str):
     """Автоматически исправляет одинарные слеши в LaTeX функциях на двойные"""
+    import re
+
     if not equation_str:
         return equation_str
 
-    latex_functions = ['sin', 'cos', 'tan', 'exp', 'log', 'ln', 'sqrt', 'alpha', 'beta', 'gamma',
-                      'delta', 'theta', 'pi', 'frac', 'arcsin', 'arccos', 'arctan']
+    # Список LaTeX функций и греческих букв
+    latex_patterns = [
+        'sin', 'cos', 'tan', 'cot', 'sec', 'csc',
+        'arcsin', 'arccos', 'arctan',
+        'sinh', 'cosh', 'tanh',
+        'exp', 'log', 'ln', 'lg',
+        'sqrt', 'frac',
+        'alpha', 'beta', 'betta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta',
+        'iota', 'kappa', 'lambda', 'mu', 'nu', 'xi', 'pi', 'rho', 'sigma', 'tau',
+        'upsilon', 'phi', 'chi', 'psi', 'omega',
+        'Alpha', 'Beta', 'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma',
+        'Phi', 'Psi', 'Omega'
+    ]
 
     result = equation_str
-    for func in latex_functions:
-        # Заменяем \func на \\func (если еще не двойной слеш)
-        result = result.replace(f'\\{func}', f'\\\\{func}')
-        # Убираем тройные слеши (если были уже двойные)
-        result = result.replace(f'\\\\\\{func}', f'\\\\{func}')
+
+    for pattern in latex_patterns:
+        # Регулярное выражение: находит \pattern, который НЕ предшествует еще одному \
+        # (?<!\\\\) - negative lookbehind, проверяет что перед \pattern нет еще одного \
+        regex = r'(?<!\\)\\' + pattern + r'\b'
+        # Заменяем на \\pattern
+        result = re.sub(regex, r'\\\\' + pattern, result)
 
     return result
 
