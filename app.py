@@ -409,16 +409,94 @@ elif mode == "Загрузить Excel":
                 st.dataframe(df, width="stretch", height=300)
 
             if st.button("Построить все графики", type="primary", width="stretch"):
+                grouped_rows = loader.get_rows_grouped_by_output()
+                total_graphs = len(grouped_rows)
+
                 progress = st.progress(0)
-                for idx in range(len(df)):
-                    progress.progress((idx + 1) / len(df))
-                    st.session_state.graph_history.append({
-                        'name': f"graph_{idx}",
-                        'timestamp': datetime.now().strftime('%H:%M:%S'),
-                        'type': 'excel'
-                    })
+                success_count = 0
+                error_count = 0
+
+                for idx, (output_file, rows) in enumerate(grouped_rows.items(), 1):
+                    progress.progress(idx / total_graphs)
+
+                    try:
+                        # Определяем тип графика из первой строки
+                        first_row = rows[0]
+                        graph_type = first_row.get('graph_type', first_row.get('type', 'ode_time'))
+
+                        # Создаем плоттер
+                        if graph_type == 'function':
+                            plotter = FunctionPlotter(vars(params_global))
+                        else:
+                            plotter = ODEPlotter(vars(params_global))
+
+                        # Строим каждую кривую
+                        for row in rows:
+                            if graph_type == 'function':
+                                formula = row.get('formula', row.get('equation_1', 'x'))
+                                x_min = row.get('x_min', row.get('xlim_min', -10))
+                                x_max = row.get('x_max', row.get('xlim_max', 10))
+                                color = row.get('color', 'blue')
+                                linewidth = row.get('linewidth', 2.0)
+
+                                plotter.add_curve_from_latex(
+                                    formula, {}, [x_min, x_max],
+                                    {"color": color, "linewidth": linewidth}
+                                )
+
+                            elif graph_type == 'ode_time':
+                                # Получаем уравнения
+                                eq1 = row.get('equation_1', 'x')
+                                eq2 = row.get('equation_2', 'y')
+                                equations = [eq1, eq2]
+
+                                var_names = ['s', 'w']
+                                ics = [row.get('ic_1', row.get('a', 1.0)),
+                                       row.get('ic_2', row.get('b', 1.0))]
+
+                                t_start = row.get('t_start', 0)
+                                t_end = row.get('t_end', row.get('s0', 100))
+
+                                # Создаем стили
+                                color = row.get('color', 'blue')
+                                styles = [{"color": color, "linewidth": 2.0},
+                                         {"color": color, "linewidth": 2.0}]
+
+                                plotter.solve_and_plot_time(
+                                    equations, var_names, ics, {},
+                                    [t_start, t_end], styles
+                                )
+
+                        # Настраиваем оси
+                        xlabel = first_row.get('xlabel', 't')
+                        ylabel = first_row.get('ylabel', 'value')
+                        plotter.set_axes(xlabel=xlabel, ylabel=ylabel, grid=True)
+
+                        # Сохраняем в SVG
+                        with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
+                            plotter.save(tmp.name)
+                            with open(tmp.name, 'rb') as f:
+                                svg_data = f.read()
+
+                            st.session_state.graph_history.append({
+                                'name': output_file,
+                                'timestamp': datetime.now().strftime('%H:%M:%S'),
+                                'type': graph_type,
+                                'svg_data': svg_data
+                            })
+                            os.unlink(tmp.name)
+
+                        success_count += 1
+
+                    except Exception as e:
+                        error_count += 1
+                        st.error(f"Ошибка для {output_file}: {str(e)}")
+
                 progress.empty()
-                st.success(f"Построено графиков: {len(df)}")
+                if success_count > 0:
+                    st.success(f"Построено графиков: {success_count}")
+                if error_count > 0:
+                    st.warning(f"Ошибок: {error_count}")
 
             os.unlink(tmp_path)
 
