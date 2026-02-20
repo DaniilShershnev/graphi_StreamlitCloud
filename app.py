@@ -952,4 +952,23 @@ if st.session_state.current_graph is not None and mode == "Построить г
 
 # Footer
 st.markdown("---")
-st.caption(f"Graph Builder | Графиков построено: {len(st.session_state.graph_history)}")
+import subprocess
+import os
+
+# Получаем информацию о последнем коммите Git
+try:
+    git_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'],
+                                       cwd=os.path.dirname(__file__)).decode('utf-8').strip()
+    git_date = subprocess.check_output(['git', 'log', '-1', '--format=%cd', '--date=format:%Y-%m-%d %H:%M'],
+                                       cwd=os.path.dirname(__file__)).decode('utf-8').strip()
+    version_info = f"v{git_hash} ({git_date})"
+except:
+    version_info = "unknown"
+
+col1, col2, col3 = st.columns([2, 1, 2])
+with col1:
+    st.caption(f"📊 Графиков построено: {len(st.session_state.graph_history)}")
+with col2:
+    st.caption(f"🔄 {version_info}")
+with col3:
+    st.caption("Для iPad Pro 11\"")
