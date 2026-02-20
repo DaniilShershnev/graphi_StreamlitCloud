@@ -306,6 +306,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Функция для автоматического исправления LaTeX (одинарный слеш -> двойной)
+def fix_latex(equation_str):
+    """Автоматически исправляет одинарные слеши в LaTeX функциях на двойные"""
+    if not equation_str:
+        return equation_str
+
+    latex_functions = ['sin', 'cos', 'tan', 'exp', 'log', 'ln', 'sqrt', 'alpha', 'beta', 'gamma',
+                      'delta', 'theta', 'pi', 'frac', 'arcsin', 'arccos', 'arctan']
+
+    result = equation_str
+    for func in latex_functions:
+        # Заменяем \func на \\func (если еще не двойной слеш)
+        result = result.replace(f'\\{func}', f'\\\\{func}')
+        # Убираем тройные слеши (если были уже двойные)
+        result = result.replace(f'\\\\\\{func}', f'\\\\{func}')
+
+    return result
+
 # Session state
 if 'graph_history' not in st.session_state:
     st.session_state.graph_history = []
@@ -450,6 +468,9 @@ elif mode == "Загрузить Excel":
                         for curve_idx, row in enumerate(rows):
                             if graph_type == 'function':
                                 formula = row.get('formula', row.get('equation_1', 'x'))
+                                # Автоматически исправляем LaTeX
+                                formula = fix_latex(formula)
+
                                 x_min = row.get('x_min', row.get('xlim_min', -10))
                                 x_max = row.get('x_max', row.get('xlim_max', 10))
 
@@ -457,15 +478,28 @@ elif mode == "Загрузить Excel":
                                 color = row.get('color') or row.get('Color') or row.get('col') or default_colors[curve_idx % len(default_colors)]
                                 linewidth = row.get('linewidth', 2.0)
 
+                                # Получаем linestyle
+                                linestyle_raw = row.get('linestyle') or row.get('line_style') or row.get('ls') or '-'
+                                linestyle_map = {
+                                    'solid': '-', '-': '-',
+                                    'dashed': '--', 'dash': '--', '--': '--',
+                                    'dotted': ':', 'dot': ':', ':': ':',
+                                    'dashdot': '-.', 'dash-dot': '-.', '-.': '-.'
+                                }
+                                actual_linestyle = linestyle_map.get(str(linestyle_raw).lower().strip(), '-')
+
                                 plotter.add_curve_from_latex(
                                     formula, {}, [x_min, x_max],
-                                    {"color": color, "linewidth": linewidth}
+                                    {"color": color, "linewidth": linewidth, "linestyle": actual_linestyle}
                                 )
 
                             elif graph_type == 'ode_time':
                                 # Получаем уравнения
                                 eq1 = row.get('equation_1', 'x')
                                 eq2 = row.get('equation_2', 'y')
+                                # Автоматически исправляем LaTeX
+                                eq1 = fix_latex(eq1)
+                                eq2 = fix_latex(eq2)
                                 equations = [eq1, eq2]
 
                                 var_names = ['s', 'w']
@@ -644,6 +678,9 @@ else:
             st.markdown("**Стиль**")
             color = st.selectbox("Цвет", ["blue", "red", "green", "purple", "orange"])
             linewidth = st.slider("Толщина", 0.5, 4.0, 2.0)
+            linestyle_func = st.selectbox("Тип линии",
+                                         ["Сплошная", "Пунктир", "Точки", "Штрих-пунктир"],
+                                         key="linestyle_func")
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -656,10 +693,22 @@ else:
         if st.button("Построить", type="primary", width="stretch"):
             try:
                 with st.spinner("Построение графика..."):
+                    # Автоматически исправляем LaTeX
+                    formula_fixed = fix_latex(formula)
+
+                    # Маппинг стилей линий
+                    linestyle_mapping = {
+                        "Сплошная": "-",
+                        "Пунктир": "--",
+                        "Точки": ":",
+                        "Штрих-пунктир": "-."
+                    }
+                    ls = linestyle_mapping.get(linestyle_func, "-")
+
                     plotter = FunctionPlotter(vars(params_global))
                     plotter.add_curve_from_latex(
-                        formula, {}, [x_min, x_max],
-                        {"color": color, "linewidth": linewidth}
+                        formula_fixed, {}, [x_min, x_max],
+                        {"color": color, "linewidth": linewidth, "linestyle": ls}
                     )
                     plotter.set_axes(xlim=[x_min, x_max], xlabel=xlabel, ylabel=ylabel, grid=True)
 
@@ -739,6 +788,9 @@ else:
                     if use_dual_y_manual:
                         plotter.enable_dual_y_axis()
 
+                    # Автоматически исправляем LaTeX в уравнениях
+                    equations_fixed = [fix_latex(eq) for eq in equations]
+
                     # Создаем стили с учетом dual_y_axis
                     if use_dual_y_manual and num_vars >= 2:
                         # Первая переменная на левой оси, вторая на правой
@@ -753,7 +805,7 @@ else:
                         styles = [{"color": colors_list[i], "linewidth": 2.0} for i in range(num_vars)]
 
                     plotter.solve_and_plot_time(
-                        equations, var_names, ics, {},
+                        equations_fixed, var_names, ics, {},
                         [t_start, t_end], styles
                     )
 
@@ -803,12 +855,12 @@ else:
             col_a, col_b = st.columns(2)
             with col_a:
                 var1 = st.text_input("Переменная 1", value="x")
-                eq1 = st.text_input(f"d{var1}/dt", value="y")
+                eq1 = st.text_input(f"d{var1}/dt", value="y", help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp")
                 ic1 = st.number_input(f"{var1}(0)", value=1.5)
 
             with col_b:
                 var2 = st.text_input("Переменная 2", value="y")
-                eq2 = st.text_input(f"d{var2}/dt", value="-\\\\sin(x)")
+                eq2 = st.text_input(f"d{var2}/dt", value="-\\\\sin(x)", help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp")
                 ic2 = st.number_input(f"{var2}(0)", value=0.0)
 
         with col2:
@@ -827,16 +879,20 @@ else:
         if st.button("Построить", type="primary", width="stretch", key="build_phase"):
             try:
                 with st.spinner("Построение фазового портрета..."):
+                    # Автоматически исправляем LaTeX (одинарный слеш -> двойной)
+                    eq1_fixed = fix_latex(eq1)
+                    eq2_fixed = fix_latex(eq2)
+
                     plotter = ODEPlotter(vars(params_global))
 
                     if show_vector:
                         plotter.add_vector_field(
-                            [eq1, eq2], [var1, var2], {}, [0, 1],
+                            [eq1_fixed, eq2_fixed], [var1, var2], {}, [0, 1],
                             {"density": density, "color": "gray", "alpha": 0.4}
                         )
 
                     plotter.solve_and_plot_phase(
-                        [eq1, eq2], [var1, var2], [ic1, ic2], {},
+                        [eq1_fixed, eq2_fixed], [var1, var2], [ic1, ic2], {},
                         [0, t_end_pp], [0, 1],
                         {"color": color_pp, "linewidth": 2.0}
                     )
