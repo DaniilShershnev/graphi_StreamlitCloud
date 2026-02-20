@@ -9,6 +9,7 @@ scipy>=1.7.0
 
 # Symbolic mathematics and LaTeX parsing
 sympy>=1.9
+antlr4-python3-runtime==4.11
 
 # Plotting and visualization
 matplotlib>=3.4.0
