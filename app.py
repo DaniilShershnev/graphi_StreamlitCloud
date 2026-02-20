@@ -306,38 +306,36 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Функция для автоматического исправления LaTeX (одинарный слеш -> двойной)
 def fix_latex(equation_str):
     r"""
-    Автоматически удваивает все обратные слеши в строке.
-    Преобразует одинарный слеш в двойной для LaTeX.
+    Преобразует LaTeX с одинарными слешами в формат для SymPy (двойные слеши).
+
+    Алгоритм с защитой существующих двойных слешей:
+    1. Заменяем \\\\ на уникальный маркер (защищаем двойные слеши)
+    2. Заменяем все оставшиеся \\ на \\\\  (удваиваем одинарные)
+    3. Возвращаем маркеры обратно в \\\\
+
+    Примеры:
+        fix_latex('-\\sin(x)')      => '-\\\\sin(x)'
+        fix_latex('\\\\sin(x)')     => '\\\\sin(x)' (не меняется)
+        fix_latex('\\exp(\\beta)')  => '\\\\exp(\\\\beta)'
     """
     if not equation_str or not isinstance(equation_str, str):
         return equation_str
 
-    # Проверяем, содержит ли строка обратные слеши
-    if '\\' not in equation_str:
-        return equation_str
+    # Используем символ null byte как маркер (гарантированно не встретится в формулах)
+    MARKER = '\x00'
 
-    # Считаем количество обратных слешей подряд и удваиваем их
-    result = []
-    i = 0
-    while i < len(equation_str):
-        if equation_str[i] == '\\':
-            # Считаем количество последовательных слешей
-            count = 0
-            j = i
-            while j < len(equation_str) and equation_str[j] == '\\':
-                count += 1
-                j += 1
-            # Удваиваем количество слешей
-            result.append('\\' * (count * 2))
-            i = j
-        else:
-            result.append(equation_str[i])
-            i += 1
+    # Шаг 1: Защищаем существующие двойные слеши
+    result = equation_str.replace('\\\\', MARKER)
 
-    return ''.join(result)
+    # Шаг 2: Удваиваем все оставшиеся одинарные слеши
+    result = result.replace('\\', '\\\\')
+
+    # Шаг 3: Восстанавливаем защищенные двойные слеши
+    result = result.replace(MARKER, '\\\\')
+
+    return result
 
 # Session state
 if 'graph_history' not in st.session_state:
@@ -897,6 +895,12 @@ else:
                     # Автоматически исправляем LaTeX (одинарный слеш -> двойной)
                     eq1_fixed = fix_latex(eq1)
                     eq2_fixed = fix_latex(eq2)
+
+                    # Отладка: показываем что получилось после fix_latex
+                    st.write(f"DEBUG: eq1 original = `{eq1}`")
+                    st.write(f"DEBUG: eq1 fixed = `{eq1_fixed}`")
+                    st.write(f"DEBUG: eq2 original = `{eq2}`")
+                    st.write(f"DEBUG: eq2 fixed = `{eq2_fixed}`")
 
                     plotter = ODEPlotter(vars(params_global))
 
