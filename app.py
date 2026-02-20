@@ -451,11 +451,34 @@ elif mode == "Загрузить Excel":
                                 equations = [eq1, eq2]
 
                                 var_names = ['s', 'w']
-                                ics = [row.get('ic_1', row.get('a', 1.0)),
-                                       row.get('ic_2', row.get('b', 1.0))]
+
+                                # Начальные условия
+                                # Приоритет 1: ic_1/ic_2 (если есть)
+                                # Приоритет 2: a/w0 (если нет ic_1/ic_2)
+                                use_a_as_ic = row.get('ic_1') is None
+                                use_w0_as_ic = row.get('ic_2') is None
+
+                                ic_s = row.get('ic_1', row.get('a', 1.0))
+                                ic_w = row.get('ic_2', row.get('w0', 1.0))
+                                ics = [ic_s, ic_w]
 
                                 t_start = row.get('t_start', 0)
                                 t_end = row.get('t_end', row.get('s0', 100))
+
+                                # Собираем параметры из колонок Excel
+                                params = {}
+                                all_param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c', 'w0']
+
+                                for param_name in all_param_cols:
+                                    # Пропускаем 'a' если использовали как начальное условие
+                                    if param_name == 'a' and use_a_as_ic:
+                                        continue
+                                    # Пропускаем 'w0' если использовали как начальное условие
+                                    if param_name == 'w0' and use_w0_as_ic:
+                                        continue
+
+                                    if param_name in row and row[param_name] is not None:
+                                        params[param_name] = row[param_name]
 
                                 # Создаем стили
                                 color = row.get('color', 'blue')
@@ -463,7 +486,7 @@ elif mode == "Загрузить Excel":
                                          {"color": color, "linewidth": 2.0}]
 
                                 plotter.solve_and_plot_time(
-                                    equations, var_names, ics, {},
+                                    equations, var_names, ics, params,
                                     [t_start, t_end], styles
                                 )
 
