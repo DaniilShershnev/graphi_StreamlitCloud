@@ -308,22 +308,36 @@ st.markdown("""
 
 # Функция для автоматического исправления LaTeX (одинарный слеш -> двойной)
 def fix_latex(equation_str):
-    """
+    r"""
     Автоматически удваивает все обратные слеши в строке.
-    Преобразует \sin -> \\sin, \exp -> \\exp, и т.д.
+    Преобразует одинарный слеш в двойной для LaTeX.
     """
-    if not equation_str:
+    if not equation_str or not isinstance(equation_str, str):
         return equation_str
 
-    # Простое решение: заменяем все одинарные \ на \\
-    # Сначала заменяем \\ на специальный маркер, чтобы не трогать уже двойные
-    result = equation_str.replace('\\\\', '###DOUBLE_BACKSLASH###')
-    # Теперь заменяем все одинарные \ на \\
-    result = result.replace('\\', '\\\\')
-    # Возвращаем маркеры обратно в \\
-    result = result.replace('###DOUBLE_BACKSLASH###', '\\\\')
+    # Проверяем, содержит ли строка обратные слеши
+    if '\\' not in equation_str:
+        return equation_str
 
-    return result
+    # Считаем количество обратных слешей подряд и удваиваем их
+    result = []
+    i = 0
+    while i < len(equation_str):
+        if equation_str[i] == '\\':
+            # Считаем количество последовательных слешей
+            count = 0
+            j = i
+            while j < len(equation_str) and equation_str[j] == '\\':
+                count += 1
+                j += 1
+            # Удваиваем количество слешей
+            result.append('\\' * (count * 2))
+            i = j
+        else:
+            result.append(equation_str[i])
+            i += 1
+
+    return ''.join(result)
 
 # Session state
 if 'graph_history' not in st.session_state:
@@ -340,7 +354,7 @@ st.markdown("---")
 with st.sidebar:
     st.subheader("Режим работы")
     mode = st.radio(
-        "",
+        "Выберите режим работы",
         ["Построить график", "Загрузить Excel", "Мои графики"],
         label_visibility="collapsed"
     )
