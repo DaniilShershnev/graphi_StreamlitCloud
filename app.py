@@ -446,6 +446,10 @@ elif mode == "Загрузить Excel":
                         first_row = rows[0]
                         graph_type = first_row.get('graph_type', first_row.get('type', 'ode_time'))
 
+                        # DEBUG: показываем что читаем из первой строки
+                        if 'linestyle' in first_row or 'line_style' in first_row or 'ls' in first_row:
+                            st.info(f"DEBUG {output_file}: linestyle колонка найдена. Значение: {first_row.get('linestyle', first_row.get('line_style', first_row.get('ls')))}")
+
                         # Создаем плоттер
                         if graph_type == 'function':
                             plotter = FunctionPlotter(vars(params_global))
@@ -554,23 +558,27 @@ elif mode == "Загрузить Excel":
                                     actual_color = color_map.get(str(color_raw).lower().strip(), str(color_raw))
 
                                 # Получаем linestyle из Excel
-                                linestyle_raw = row.get('linestyle') or row.get('line_style') or row.get('ls') or '-'
+                                linestyle_raw = row.get('linestyle') or row.get('line_style') or row.get('ls')
 
-                                # Маппинг стилей линий
-                                linestyle_map = {
-                                    'solid': '-',
-                                    '-': '-',
-                                    'dashed': '--',
-                                    'dash': '--',
-                                    '--': '--',
-                                    'dotted': ':',
-                                    'dot': ':',
-                                    ':': ':',
-                                    'dashdot': '-.',
-                                    'dash-dot': '-.',
-                                    '-.': '-.'
-                                }
-                                actual_linestyle = linestyle_map.get(str(linestyle_raw).lower().strip(), '-')
+                                # Проверяем на NaN/None/пустую строку
+                                if linestyle_raw is None or (isinstance(linestyle_raw, float) and pd.isna(linestyle_raw)) or str(linestyle_raw).strip() == '':
+                                    actual_linestyle = '-'  # По умолчанию сплошная линия
+                                else:
+                                    # Маппинг стилей линий
+                                    linestyle_map = {
+                                        'solid': '-',
+                                        '-': '-',
+                                        'dashed': '--',
+                                        'dash': '--',
+                                        '--': '--',
+                                        'dotted': ':',
+                                        'dot': ':',
+                                        ':': ':',
+                                        'dashdot': '-.',
+                                        'dash-dot': '-.',
+                                        '-.': '-.'
+                                    }
+                                    actual_linestyle = linestyle_map.get(str(linestyle_raw).lower().strip(), '-')
 
                                 # Проверяем, используется ли dual_y_axis
                                 use_dual_y = first_row.get('dual_y_axis') or first_row.get('dual_y') or first_row.get('two_axes')
