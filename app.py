@@ -309,6 +309,25 @@ st.markdown("""
 # fix_latex() REMOVED - parse_latex() from sympy handles LaTeX natively
 # No need to escape backslashes - just pass \sin, \exp, \alpha, etc. as-is
 
+# Расширенная цветовая палитра для iPad
+COLOR_OPTIONS = {
+    "Красный": "red",
+    "Синий": "blue",
+    "Зеленый": "green",
+    "Оранжевый": "orange",
+    "Фиолетовый": "purple",
+    "Голубой": "cyan",
+    "Розовый": "magenta",
+    "Желтый": "yellow",
+    "Черный": "black",
+    "Серый": "gray",
+    "Коричневый": "brown",
+    "Лайм": "lime",
+    "Темно-синий": "navy",
+    "Бордовый": "maroon",
+    "Оливковый": "olive"
+}
+
 # Session state
 if 'graph_history' not in st.session_state:
     st.session_state.graph_history = []
@@ -661,8 +680,10 @@ else:
 
         with col2:
             st.markdown("**Стиль**")
-            color = st.selectbox("Цвет", ["blue", "red", "green", "purple", "orange"])
-            linewidth = st.slider("Толщина", 0.5, 4.0, 2.0)
+            color_name = st.selectbox("Цвет", list(COLOR_OPTIONS.keys()), index=1)  # Синий по умолчанию
+            color = COLOR_OPTIONS[color_name]
+            linewidth = st.slider("Толщина", 0.5, 4.0, 2.0, step=0.1)
+            alpha = st.slider("Прозрачность", 0.0, 1.0, 1.0, step=0.05, help="0 = полностью прозрачный, 1 = непрозрачный")
             linestyle_func = st.selectbox("Тип линии",
                                          ["Сплошная", "Пунктир", "Точки", "Штрих-пунктир"],
                                          key="linestyle_func")
@@ -693,7 +714,7 @@ else:
                     plotter = FunctionPlotter(vars(params_global))
                     plotter.add_curve_from_latex(
                         formula_fixed, {}, [x_min, x_max],
-                        {"color": color, "linewidth": linewidth, "linestyle": ls}
+                        {"color": color, "linewidth": linewidth, "linestyle": ls, "alpha": alpha}
                     )
                     plotter.set_axes(xlim=[x_min, x_max], xlabel=xlabel, ylabel=ylabel, grid=True)
 
@@ -747,8 +768,8 @@ else:
                     ic = st.number_input("Нач. усл.", value=float(i+1), key=f"ic_{i}", label_visibility="collapsed")
                     ics.append(ic)
                 with col_d:
-                    c = st.selectbox("Цвет", ["blue", "red", "green", "orange", "purple"], key=f"c_{i}", label_visibility="collapsed")
-                    colors_list.append(c)
+                    c_name = st.selectbox("Цвет", list(COLOR_OPTIONS.keys()), index=min(i, len(COLOR_OPTIONS)-1), key=f"c_{i}", label_visibility="collapsed")
+                    colors_list.append(COLOR_OPTIONS[c_name])
 
         with col2:
             st.markdown("**Время**")
@@ -851,11 +872,14 @@ else:
         with col2:
             st.markdown("**Настройки**")
             t_end_pp = st.number_input("Время", value=50.0, step=5.0)
-            color_pp = st.selectbox("Цвет", ["blue", "red", "green", "purple"])
+            color_pp_name = st.selectbox("Цвет траектории", list(COLOR_OPTIONS.keys()), index=1)
+            color_pp = COLOR_OPTIONS[color_pp_name]
+            linewidth_pp = st.slider("Толщина линии", 0.5, 4.0, 2.0, step=0.1)
+            alpha_pp = st.slider("Прозрачность", 0.0, 1.0, 1.0, step=0.05)
             show_vector = st.checkbox("Векторное поле", value=True)
 
             if show_vector:
-                density = st.slider("Плотность", 5, 30, 15)
+                density = st.slider("Плотность поля", 5, 30, 15)
 
             xlabel_pp = st.text_input("Ось X", value="x", key="xlabel_pp")
             ylabel_pp = st.text_input("Ось Y", value="y", key="ylabel_pp")
@@ -879,7 +903,7 @@ else:
                     plotter.solve_and_plot_phase(
                         [eq1_fixed, eq2_fixed], [var1, var2], [ic1, ic2], {},
                         [0, t_end_pp], [0, 1],
-                        {"color": color_pp, "linewidth": 2.0}
+                        {"color": color_pp, "linewidth": linewidth_pp, "alpha": alpha_pp}
                     )
                     plotter.set_axes(xlabel=xlabel_pp, ylabel=ylabel_pp, grid=True)
 
