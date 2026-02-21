@@ -57,8 +57,8 @@ class ExcelConfigLoader:
             # Удаляем полностью пустые строки
             self.df = self.df.dropna(how='all')
 
-            # Убираем лишние пробелы в названиях колонок
-            self.df.columns = self.df.columns.str.strip()
+            # Убираем лишние пробелы в названиях колонок (преобразуем в строки сначала)
+            self.df.columns = self.df.columns.astype(str).str.strip()
 
             self.row_count = len(self.df)
 

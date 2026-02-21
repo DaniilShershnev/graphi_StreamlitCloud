@@ -688,6 +688,10 @@ else:
                                          ["Сплошная", "Пунктир", "Точки", "Штрих-пунктир"],
                                          key="linestyle_func")
 
+            st.markdown("**Оси графика**")
+            show_top_spine = st.checkbox("Верхняя ось", value=False, key="show_top_func")
+            show_right_spine = st.checkbox("Правая ось", value=False, key="show_right_func")
+
         col1, col2, col3 = st.columns(3)
         with col1:
             xlabel = st.text_input("Ось X", value="x")
@@ -716,7 +720,22 @@ else:
                         formula_fixed, {}, [x_min, x_max],
                         {"color": color, "linewidth": linewidth, "linestyle": ls, "alpha": alpha}
                     )
-                    plotter.set_axes(xlim=[x_min, x_max], xlabel=xlabel, ylabel=ylabel, grid=True)
+
+                    # Настройка видимости осей
+                    spines_config = {
+                        'top': show_top_spine,
+                        'right': show_right_spine,
+                        'bottom': True,  # Нижняя ось всегда видима
+                        'left': True      # Левая ось всегда видима
+                    }
+
+                    plotter.set_axes(
+                        xlim=[x_min, x_max],
+                        xlabel=xlabel,
+                        ylabel=ylabel,
+                        grid=True,
+                        spines=spines_config
+                    )
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
                         plotter.save(tmp.name)
@@ -866,7 +885,7 @@ else:
 
             with col_b:
                 var2 = st.text_input("Переменная 2", value="y")
-                eq2 = st.text_input(f"d{var2}/dt", value="-\\\\sin(x)", help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp")
+                eq2 = st.text_input(f"d{var2}/dt", value=r"-\sin(x)", help="Используйте одинарный слеш: \\sin, \\cos, \\exp")
                 ic2 = st.number_input(f"{var2}(0)", value=0.0)
 
         with col2:
@@ -880,6 +899,10 @@ else:
 
             if show_vector:
                 density = st.slider("Плотность поля", 5, 30, 15)
+
+            st.markdown("**Оси графика**")
+            show_top_spine_pp = st.checkbox("Верхняя ось", value=False, key="show_top_pp")
+            show_right_spine_pp = st.checkbox("Правая ось", value=False, key="show_right_pp")
 
             xlabel_pp = st.text_input("Ось X", value="x", key="xlabel_pp")
             ylabel_pp = st.text_input("Ось Y", value="y", key="ylabel_pp")
@@ -905,7 +928,21 @@ else:
                         [0, t_end_pp], [0, 1],
                         {"color": color_pp, "linewidth": linewidth_pp, "alpha": alpha_pp}
                     )
-                    plotter.set_axes(xlabel=xlabel_pp, ylabel=ylabel_pp, grid=True)
+
+                    # Настройка видимости осей
+                    spines_config_pp = {
+                        'top': show_top_spine_pp,
+                        'right': show_right_spine_pp,
+                        'bottom': True,
+                        'left': True
+                    }
+
+                    plotter.set_axes(
+                        xlabel=xlabel_pp,
+                        ylabel=ylabel_pp,
+                        grid=True,
+                        spines=spines_config_pp
+                    )
 
                     with tempfile.NamedTemporaryFile(delete=False, suffix='.svg') as tmp:
                         plotter.save(tmp.name)
