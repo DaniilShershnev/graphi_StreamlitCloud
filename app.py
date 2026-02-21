@@ -306,35 +306,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def fix_latex(equation_str):
-    r"""
-    Квадрирует количество обратных слешей для SymPy через ODEPlotter.
-
-    Проблема: ODEPlotter/SymPy интерпретирует слеши дважды:
-    - Входная строка из UI: '-\sin(x)' (1 слеш в runtime)
-    - Нужно для SymPy: 4 слеша в runtime → 2 после первой интерпретации → 1 у SymPy
-
-    Решение: Удваиваем дважды (1 → 2 → 4)
-    """
-    if not equation_str or not isinstance(equation_str, str):
-        return equation_str
-
-    # Считаем текущее количество слешей и умножаем на 4
-    result = equation_str
-
-    # Первое удвоение
-    MARKER1 = '\x00'
-    result = result.replace('\\\\', MARKER1)
-    result = result.replace('\\', '\\\\')
-    result = result.replace(MARKER1, '\\\\')
-
-    # Второе удвоение (теперь 1→2→4)
-    MARKER2 = '\x01'
-    result = result.replace('\\\\', MARKER2)
-    result = result.replace('\\', '\\\\')
-    result = result.replace(MARKER2, '\\\\')
-
-    return result
+# fix_latex() REMOVED - parse_latex() from sympy handles LaTeX natively
+# No need to escape backslashes - just pass \sin, \exp, \alpha, etc. as-is
 
 # Session state
 if 'graph_history' not in st.session_state:
@@ -481,7 +454,7 @@ elif mode == "Загрузить Excel":
                             if graph_type == 'function':
                                 formula = row.get('formula', row.get('equation_1', 'x'))
                                 # Автоматически исправляем LaTeX
-                                formula = fix_latex(formula)
+                                # formula = fix_latex(formula)  # REMOVED: parse_latex handles LaTeX natively
 
                                 x_min = row.get('x_min', row.get('xlim_min', -10))
                                 x_max = row.get('x_max', row.get('xlim_max', 10))
@@ -510,8 +483,8 @@ elif mode == "Загрузить Excel":
                                 eq1 = row.get('equation_1', 'x')
                                 eq2 = row.get('equation_2', 'y')
                                 # Автоматически исправляем LaTeX
-                                eq1 = fix_latex(eq1)
-                                eq2 = fix_latex(eq2)
+                                # eq1 = fix_latex(eq1)  # REMOVED
+                                # eq2 = fix_latex(eq2)  # REMOVED
                                 equations = [eq1, eq2]
 
                                 var_names = ['s', 'w']
@@ -706,7 +679,7 @@ else:
             try:
                 with st.spinner("Построение графика..."):
                     # Автоматически исправляем LaTeX
-                    formula_fixed = fix_latex(formula)
+                    formula_fixed = formula  # parse_latex handles LaTeX natively
 
                     # Маппинг стилей линий
                     linestyle_mapping = {
@@ -801,7 +774,7 @@ else:
                         plotter.enable_dual_y_axis()
 
                     # Автоматически исправляем LaTeX в уравнениях
-                    equations_fixed = [fix_latex(eq) for eq in equations]
+                    equations_fixed = equations  # parse_latex handles LaTeX natively
 
                     # Создаем стили с учетом dual_y_axis
                     if use_dual_y_manual and num_vars >= 2:
@@ -891,17 +864,9 @@ else:
         if st.button("Построить", type="primary", width="stretch", key="build_phase"):
             try:
                 with st.spinner("Построение фазового портрета..."):
-                    # Автоматически исправляем LaTeX (одинарный слеш -> двойной)
-                    eq1_fixed = fix_latex(eq1)
-                    eq2_fixed = fix_latex(eq2)
-
-                    # Отладка: показываем ТОЧНОЕ содержимое строк
-                    st.write(f"DEBUG: eq2 original visual = `{eq2}`")
-                    st.write(f"DEBUG: eq2 original repr = `{repr(eq2)}`")
-                    st.write(f"DEBUG: eq2 fixed visual = `{eq2_fixed}`")
-                    st.write(f"DEBUG: eq2 fixed repr = `{repr(eq2_fixed)}`")
-                    st.write(f"DEBUG: eq2 original has single backslash? {chr(92) in eq2}")
-                    st.write(f"DEBUG: eq2 original count of backslashes: {eq2.count(chr(92))}")
+                    # parse_latex handles LaTeX natively - no escaping needed
+                    eq1_fixed = eq1
+                    eq2_fixed = eq2
 
                     plotter = ODEPlotter(vars(params_global))
 
