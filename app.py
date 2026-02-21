@@ -561,10 +561,10 @@ elif mode == "Загрузить Excel":
                                     use_dual_y = bool(use_dual_y) if use_dual_y else False
 
                                 if use_dual_y:
-                                    # Две оси: s на левой (синий), w на правой (красный)
+                                    # Две оси: s на левой, w на правой
                                     styles = [
                                         {"color": actual_color, "linewidth": 2.0, "linestyle": actual_linestyle},  # s на левой оси
-                                        {"color": 'red', "linewidth": 1.5, "linestyle": ':', "axis": "right"}  # w на правой оси
+                                        {"color": 'red', "linewidth": 1.5, "linestyle": ':', "use_right_axis": True}  # w на правой оси
                                     ]
                                 else:
                                     # Одна ось: строим только s, w не строим
@@ -781,7 +781,7 @@ else:
                         # Первая переменная на левой оси, вторая на правой
                         styles = [
                             {"color": colors_list[0], "linewidth": 2.0},
-                            {"color": colors_list[1], "linewidth": 2.0, "axis": "right"}
+                            {"color": colors_list[1], "linewidth": 2.0, "use_right_axis": True}
                         ]
                         # Остальные переменные на левой оси
                         for i in range(2, num_vars):
