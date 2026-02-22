@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 import base64
 import io
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -405,6 +406,10 @@ if 'graph_history' not in st.session_state:
     st.session_state.graph_history = []
 if 'current_graph' not in st.session_state:
     st.session_state.current_graph = None
+if 'saved_excel_configs' not in st.session_state:
+    st.session_state.saved_excel_configs = {}  # {name: dataframe}
+if 'saved_manual_configs' not in st.session_state:
+    st.session_state.saved_manual_configs = {}  # {name: config_dict}
 
 # Header
 st.title("Graph Builder")
@@ -416,7 +421,7 @@ with st.sidebar:
     st.subheader("Режим работы")
     mode = st.radio(
         "Выберите режим работы",
-        ["Построить график", "Загрузить Excel", "Мои графики"],
+        ["Построить график", "Загрузить Excel", "Мои графики", "Библиотека"],
         label_visibility="collapsed"
     )
 
@@ -439,11 +444,38 @@ if mode == "Мои графики":
     if not st.session_state.graph_history:
         st.info("Графики еще не построены. Перейдите в режим 'Построить график'")
     else:
-        for i in range(0, len(st.session_state.graph_history), 2):
+        # Фильтры и поиск
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            search_query = st.text_input("🔍 Поиск по имени", placeholder="Введите название графика", label_visibility="collapsed")
+        with col2:
+            filter_type = st.selectbox("Тип", ["Все"] + list(set([g.get('type', 'unknown') for g in st.session_state.graph_history])), label_visibility="collapsed")
+        with col3:
+            sort_by = st.selectbox("Сортировка", ["Новые первые", "Старые первые", "По имени"], label_visibility="collapsed")
+
+        # Фильтрация
+        filtered_graphs = st.session_state.graph_history.copy()
+
+        if search_query:
+            filtered_graphs = [g for g in filtered_graphs if search_query.lower() in g['name'].lower()]
+
+        if filter_type != "Все":
+            filtered_graphs = [g for g in filtered_graphs if g.get('type', 'unknown') == filter_type]
+
+        # Сортировка
+        if sort_by == "Старые первые":
+            filtered_graphs = list(reversed(filtered_graphs))
+        elif sort_by == "По имени":
+            filtered_graphs = sorted(filtered_graphs, key=lambda g: g['name'])
+
+        st.caption(f"Найдено графиков: {len(filtered_graphs)} из {len(st.session_state.graph_history)}")
+        st.markdown("---")
+
+        for i in range(0, len(filtered_graphs), 2):
             cols = st.columns(2)
             for j, col in enumerate(cols):
-                if i + j < len(st.session_state.graph_history):
-                    graph = st.session_state.graph_history[i + j]
+                if i + j < len(filtered_graphs):
+                    graph = filtered_graphs[i + j]
                     with col:
                         st.markdown("<div class='gallery-card'>", unsafe_allow_html=True)
                         st.markdown(f"**{graph['name']}**")
@@ -468,9 +500,121 @@ if mode == "Мои графики":
                                 )
                             with col_b:
                                 if st.button("Удалить", width="stretch", key=f"del_{i}_{j}"):
-                                    st.session_state.graph_history.pop(i+j)
+                                    # Находим и удаляем график из оригинального списка
+                                    st.session_state.graph_history = [g for g in st.session_state.graph_history if not (g['name'] == graph['name'] and g['timestamp'] == graph['timestamp'])]
+                                    st.rerun()
 
                         st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ========== БИБЛИОТЕКА ==========
+elif mode == "Библиотека":
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.subheader("📚 Библиотека сохраненных данных")
+
+    tab1, tab2, tab3 = st.tabs(["Excel конфигурации", "Ручные настройки", "Экспорт/Импорт"])
+
+    # TAB 1: Excel конфигурации
+    with tab1:
+        st.markdown("### Сохраненные Excel конфигурации")
+
+        if not st.session_state.saved_excel_configs:
+            st.info("📝 Библиотека пуста. Сохраните конфигурацию в разделе 'Загрузить Excel'")
+        else:
+            st.success(f"Сохранено конфигураций: {len(st.session_state.saved_excel_configs)}")
+
+            for config_name in list(st.session_state.saved_excel_configs.keys()):
+                with st.expander(f"📊 {config_name}", expanded=False):
+                    config_df = st.session_state.saved_excel_configs[config_name]
+                    st.dataframe(config_df, use_container_width=True, height=200)
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        # Скачать Excel
+                        output = io.BytesIO()
+                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                            config_df.to_excel(writer, index=False, sheet_name='Sheet1')
+                        excel_data = output.getvalue()
+
+                        st.download_button(
+                            "⬇️ Скачать",
+                            data=excel_data,
+                            file_name=f"{config_name}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                            key=f"dl_excel_{config_name}"
+                        )
+                    with col2:
+                        # Загрузить в редактор
+                        if st.button("📂 Загрузить", use_container_width=True, key=f"load_excel_{config_name}"):
+                            st.session_state.edited_df = config_df.copy()
+                            st.success(f"✅ Загружено в редактор")
+                            st.info("Перейдите в 'Загрузить Excel' для построения графиков")
+                    with col3:
+                        # Удалить
+                        if st.button("🗑️ Удалить", use_container_width=True, key=f"del_excel_{config_name}"):
+                            del st.session_state.saved_excel_configs[config_name]
+                            st.rerun()
+
+    # TAB 2: Ручные настройки (для будущего)
+    with tab2:
+        st.markdown("### Сохраненные ручные настройки")
+        if not st.session_state.saved_manual_configs:
+            st.info("📝 Здесь будут сохраняться настройки из режима 'Построить график'")
+            st.caption("Функция в разработке...")
+        else:
+            for config_name, config_dict in st.session_state.saved_manual_configs.items():
+                with st.expander(f"⚙️ {config_name}"):
+                    st.json(config_dict)
+
+    # TAB 3: Экспорт/Импорт
+    with tab3:
+        st.markdown("### Экспорт/Импорт библиотеки")
+
+        st.markdown("#### 📤 Экспорт")
+        st.caption("Сохраните всю библиотеку в один файл для переноса на другое устройство")
+
+        if st.button("📦 Экспортировать библиотеку", use_container_width=True):
+            library_data = {
+                'excel_configs': {},
+                'manual_configs': st.session_state.saved_manual_configs,
+                'timestamp': datetime.now().isoformat()
+            }
+
+            # Конвертируем DataFrame в dict для JSON
+            for name, df in st.session_state.saved_excel_configs.items():
+                library_data['excel_configs'][name] = df.to_dict(orient='records')
+
+            library_json = json.dumps(library_data, ensure_ascii=False, indent=2)
+
+            st.download_button(
+                "⬇️ Скачать библиотеку (JSON)",
+                data=library_json,
+                file_name=f"graph_library_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                use_container_width=True
+            )
+
+        st.markdown("#### 📥 Импорт")
+        st.caption("Загрузите ранее сохраненную библиотеку")
+
+        uploaded_library = st.file_uploader("Выберите JSON файл библиотеки", type=['json'])
+        if uploaded_library:
+            try:
+                library_data = json.loads(uploaded_library.getvalue().decode('utf-8'))
+
+                # Восстанавливаем Excel конфигурации
+                for name, records in library_data.get('excel_configs', {}).items():
+                    st.session_state.saved_excel_configs[name] = pd.DataFrame(records)
+
+                # Восстанавливаем ручные настройки
+                st.session_state.saved_manual_configs.update(library_data.get('manual_configs', {}))
+
+                st.success(f"✅ Библиотека загружена! Дата экспорта: {library_data.get('timestamp', 'неизвестна')}")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Ошибка при импорте: {str(e)}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -593,9 +737,32 @@ elif mode == "Загрузить Excel":
                     use_container_width=True
                 )
             with col3:
-                pass  # Резерв для будущих кнопок
+                # Сохранение в библиотеку
+                if st.button("💾 В библиотеку", use_container_width=True, help="Сохранить эту конфигурацию для быстрого доступа"):
+                    # Открываем диалог для ввода имени
+                    with st.expander("Сохранить конфигурацию", expanded=True):
+                        save_name = st.text_input("Имя конфигурации", value=uploaded_file.name.replace('.xlsx', '').replace('.xls', ''))
+                        if st.button("Сохранить", key="save_confirm"):
+                            st.session_state.saved_excel_configs[save_name] = edited_df.copy()
+                            st.success(f"✅ Конфигурация '{save_name}' сохранена в библиотеке")
+                            st.rerun()
 
             st.markdown("---")
+
+            # Быстрая загрузка из библиотеки
+            if st.session_state.saved_excel_configs:
+                st.markdown("### 📚 Быстрая загрузка из библиотеки")
+                saved_config_name = st.selectbox(
+                    "Выберите сохраненную конфигурацию",
+                    ["Не выбрано"] + list(st.session_state.saved_excel_configs.keys()),
+                    key="load_saved_config"
+                )
+                if saved_config_name != "Не выбрано":
+                    if st.button(f"📂 Загрузить '{saved_config_name}'", use_container_width=True):
+                        st.session_state.edited_df = st.session_state.saved_excel_configs[saved_config_name].copy()
+                        st.success(f"✅ Загружена конфигурация '{saved_config_name}'")
+                        st.rerun()
+                st.markdown("---")
 
             if st.button("🎨 Построить все графики", type="primary", width="stretch"):
                 # Используем отредактированные данные вместо оригинальных
