@@ -5,6 +5,7 @@ import tempfile
 import pandas as pd
 from datetime import datetime
 import base64
+import io
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -498,11 +499,114 @@ elif mode == "Загрузить Excel":
 
             st.success(f"Загружено строк: {len(df)}")
 
-            with st.expander("Предпросмотр таблицы", expanded=True):
-                st.dataframe(df, width="stretch", height=300)
+            # Интерактивный редактор таблицы с выпадающими меню
+            st.markdown("### 📝 Редактор таблицы")
+            st.caption("Вы можете редактировать данные прямо здесь. Выберите значения из выпадающих списков где это возможно.")
 
-            if st.button("Построить все графики", type="primary", width="stretch"):
-                grouped_rows = loader.get_rows_grouped_by_output()
+            # Конфигурация колонок с выпадающими меню
+            column_config = {}
+
+            # Выпадающие меню для типов графиков
+            if 'graph_type' in df.columns or 'type' in df.columns:
+                col_name = 'graph_type' if 'graph_type' in df.columns else 'type'
+                column_config[col_name] = st.column_config.SelectboxColumn(
+                    "Тип графика",
+                    options=["function", "ode_time", "phase_portrait"],
+                    help="Выберите тип графика"
+                )
+
+            # Выпадающие меню для цветов
+            color_options_excel = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow", "black", "gray"]
+            for col in ['color', 'Color', 'col', 'color_s', 'color_w']:
+                if col in df.columns:
+                    column_config[col] = st.column_config.SelectboxColumn(
+                        f"Цвет ({col})",
+                        options=color_options_excel,
+                        help="Выберите цвет линии"
+                    )
+
+            # Выпадающие меню для стилей линий
+            linestyle_options = ["-", "--", ":", "-."]
+            for col in ['linestyle', 'line_style', 'ls', 'linestyle_s', 'linestyle_w', 'isoclines_linestyle_ds', 'isoclines_linestyle_dw']:
+                if col in df.columns:
+                    column_config[col] = st.column_config.SelectboxColumn(
+                        f"Стиль линии ({col})",
+                        options=linestyle_options,
+                        help="Сплошная (-), пунктир (--), точки (:), штрих-пунктир (-.)"
+                    )
+
+            # Числовые колонки
+            numeric_cols = ['linewidth', 'linewidth_s', 'linewidth_w', 'x_min', 'x_max', 'xlim_min', 'xlim_max',
+                           'ylim_min', 'ylim_max', 't_start', 't_end', 's0', 'w0', 'ic_1', 'ic_2',
+                           'a', 'b', 'h', 'alpha', 'betta', 'beta', 'c', 'dpi']
+            for col in numeric_cols:
+                if col in df.columns:
+                    column_config[col] = st.column_config.NumberColumn(
+                        col,
+                        help=f"Числовое значение для {col}",
+                        format="%.4f"
+                    )
+
+            # Boolean колонки
+            bool_cols = ['dual_y_axis', 'dual_y', 'two_axes', 'vector_field_enabled', 'isoclines_enabled']
+            for col in bool_cols:
+                if col in df.columns:
+                    column_config[col] = st.column_config.CheckboxColumn(
+                        col,
+                        help=f"Включить/выключить {col}"
+                    )
+
+            # Сохраняем отредактированные данные в session_state
+            if 'edited_df' not in st.session_state:
+                st.session_state.edited_df = df.copy()
+
+            edited_df = st.data_editor(
+                st.session_state.edited_df,
+                column_config=column_config,
+                num_rows="dynamic",  # Позволяет добавлять и удалять строки
+                use_container_width=True,
+                height=400,
+                key="excel_editor"
+            )
+
+            # Обновляем session_state
+            st.session_state.edited_df = edited_df
+
+            # Кнопки управления
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("↻ Сбросить изменения", use_container_width=True):
+                    st.session_state.edited_df = df.copy()
+                    st.rerun()
+            with col2:
+                # Экспорт в Excel
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    edited_df.to_excel(writer, index=False, sheet_name='Sheet1')
+                excel_data = output.getvalue()
+
+                st.download_button(
+                    label="⬇️ Скачать Excel",
+                    data=excel_data,
+                    file_name="edited_config.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            with col3:
+                pass  # Резерв для будущих кнопок
+
+            st.markdown("---")
+
+            if st.button("🎨 Построить все графики", type="primary", width="stretch"):
+                # Используем отредактированные данные вместо оригинальных
+                # Сохраняем во временный файл и загружаем заново
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx', mode='wb') as tmp_edited:
+                    edited_df.to_excel(tmp_edited.name, index=False)
+                    tmp_edited_path = tmp_edited.name
+
+                edited_loader = ExcelConfigLoader(tmp_edited_path)
+                edited_loader.load_table()
+                grouped_rows = edited_loader.get_rows_grouped_by_output()
                 total_graphs = len(grouped_rows)
 
                 progress = st.progress(0)
@@ -851,6 +955,9 @@ elif mode == "Загрузить Excel":
                     st.success(f"Построено графиков: {success_count}")
                 if error_count > 0:
                     st.warning(f"Ошибок: {error_count}")
+
+                # Удаляем временный файл с отредактированными данными
+                os.unlink(tmp_edited_path)
 
             os.unlink(tmp_path)
 
