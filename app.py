@@ -605,9 +605,114 @@ elif mode == "Загрузить Excel":
                                     [t_start, t_end], styles
                                 )
 
+                            elif graph_type == 'phase_portrait':
+                                # Фазовый портрет
+                                eq1 = row.get('equation_1', 'x')
+                                eq2 = row.get('equation_2', 'y')
+                                equations = [eq1, eq2]
+
+                                var_names = ['s', 'w']
+
+                                # Начальные условия
+                                ic_s = row.get('s0', 1.0)
+                                ic_w = row.get('w0', 0.0)
+                                ics = [ic_s, ic_w]
+
+                                # Параметры
+                                params = {}
+                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
+                                for param_name in param_cols:
+                                    if param_name in row and row[param_name] is not None:
+                                        params[param_name] = row[param_name]
+
+                                # Время
+                                t_start = row.get('t_start', 0)
+                                t_end = row.get('t_end', 100)
+
+                                # Стиль траектории
+                                color_s = row.get('color_s', 'red')
+                                linewidth_s = row.get('linewidth_s', 0.6)
+                                linestyle_s_raw = row.get('linestyle_s', '-')
+
+                                # Маппинг linestyle
+                                linestyle_map = {'-': '-', '--': '--', ':': ':', '-.': '-.'}
+                                linestyle_s = linestyle_map.get(str(linestyle_s_raw).strip(), '-')
+
+                                style = {
+                                    "color": color_s,
+                                    "linewidth": linewidth_s,
+                                    "linestyle": linestyle_s
+                                }
+
+                                # Добавляем траекторию
+                                plotter.solve_and_plot_trajectory(
+                                    equations, var_names, ics, params,
+                                    [0, 1],  # var_indices для s и w
+                                    [t_start, t_end],
+                                    style
+                                )
+
+                        # Обработка векторного поля и изоклин для фазового портрета
+                        if graph_type == 'phase_portrait':
+                            # Векторное поле
+                            vector_field_enabled = first_row.get('vector_field_enabled')
+                            if vector_field_enabled and str(vector_field_enabled).lower() in ('true', 'yes', '1'):
+                                # Получаем параметры из первой строки для векторного поля
+                                eq1 = first_row.get('equation_1', 'x')
+                                eq2 = first_row.get('equation_2', 'y')
+                                equations = [eq1, eq2]
+                                var_names = ['s', 'w']
+
+                                params = {}
+                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
+                                for param_name in param_cols:
+                                    if param_name in first_row and first_row[param_name] is not None:
+                                        params[param_name] = first_row[param_name]
+
+                                field_config = {
+                                    'density': int(first_row.get('vector_field_density', 50)),
+                                    'color': first_row.get('vector_field_color', 'lightgray'),
+                                    'alpha': float(first_row.get('vector_field_alpha', 0.5))
+                                }
+
+                                plotter.add_vector_field(
+                                    equations, var_names, params,
+                                    [0, 1],  # var_indices для s и w
+                                    field_config
+                                )
+
+                            # Изоклины
+                            isoclines_enabled = first_row.get('isoclines_enabled')
+                            if isoclines_enabled and str(isoclines_enabled).lower() in ('true', 'yes', '1'):
+                                eq1 = first_row.get('equation_1', 'x')
+                                eq2 = first_row.get('equation_2', 'y')
+                                equations = [eq1, eq2]
+                                var_names = ['s', 'w']
+
+                                params = {}
+                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
+                                for param_name in param_cols:
+                                    if param_name in first_row and first_row[param_name] is not None:
+                                        params[param_name] = first_row[param_name]
+
+                                isocline_config = {
+                                    'linestyle_ds': first_row.get('isoclines_linestyle_ds', '--'),
+                                    'linestyle_dw': first_row.get('isoclines_linestyle_dw', '--'),
+                                    'color_ds': first_row.get('isoclines_color_ds', 'black'),
+                                    'color_dw': first_row.get('isoclines_color_dw', 'darkred'),
+                                    'linewidth_ds': float(first_row.get('isoclines_linewidth_ds', 1.5)),
+                                    'linewidth_dw': float(first_row.get('isoclines_linewidth_dw', 1.5))
+                                }
+
+                                plotter.add_isoclines(
+                                    equations, var_names, params,
+                                    [0, 1],  # var_indices для s и w
+                                    isocline_config
+                                )
+
                         # Настраиваем оси
-                        xlabel = first_row.get('xlabel', 't')
-                        ylabel = first_row.get('ylabel', 'value')
+                        xlabel = first_row.get('xlabel', 't' if graph_type != 'phase_portrait' else 's')
+                        ylabel = first_row.get('ylabel', 'value' if graph_type != 'phase_portrait' else 'w')
 
                         # Проверяем dual_y_axis для настройки осей
                         use_dual_y = first_row.get('dual_y_axis') or first_row.get('dual_y') or first_row.get('two_axes')
@@ -623,6 +728,20 @@ elif mode == "Загрузить Excel":
                                 ylabel=ylabel if ylabel != 'value' else 's',
                                 ylabel_right=ylabel_right,
                                 dual_y_axis=True,
+                                grid=True
+                            )
+                        elif graph_type == 'phase_portrait':
+                            # Для фазового портрета настраиваем xlim и ylim
+                            xlim_min = first_row.get('xlim_min', 0)
+                            xlim_max = first_row.get('xlim_max', 3)
+                            ylim_min = first_row.get('ylim_min', 0)
+                            ylim_max = first_row.get('ylim_max', 3)
+
+                            plotter.set_axes(
+                                xlim=[xlim_min, xlim_max],
+                                ylim=[ylim_min, ylim_max],
+                                xlabel=xlabel,
+                                ylabel=ylabel,
                                 grid=True
                             )
                         else:
