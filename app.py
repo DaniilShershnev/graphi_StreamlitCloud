@@ -606,11 +606,79 @@ elif mode == "Загрузить Excel":
                                 )
 
                             elif graph_type == 'phase_portrait':
-                                # Фазовый портрет
+                                # Фазовый портрет - обрабатывается отдельно после цикла
+                                pass
+
+                        # Обработка фазового портрета (после всех строк)
+                        if graph_type == 'phase_portrait':
+                            # Сначала устанавливаем пределы осей
+                            xlim_min = first_row.get('xlim_min', 0)
+                            xlim_max = first_row.get('xlim_max', 3)
+                            ylim_min = first_row.get('ylim_min', 0)
+                            ylim_max = first_row.get('ylim_max', 3)
+                            plotter.ax.set_xlim([xlim_min, xlim_max])
+                            plotter.ax.set_ylim([ylim_min, ylim_max])
+
+                            # Затем векторное поле (если включено)
+                            vector_field_enabled = first_row.get('vector_field_enabled')
+                            if vector_field_enabled and str(vector_field_enabled).lower() in ('true', 'yes', '1'):
+                                eq1 = first_row.get('equation_1', 'x')
+                                eq2 = first_row.get('equation_2', 'y')
+                                equations = [eq1, eq2]
+                                var_names = ['s', 'w']
+
+                                params = {}
+                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
+                                for param_name in param_cols:
+                                    if param_name in first_row and first_row[param_name] is not None:
+                                        params[param_name] = first_row[param_name]
+
+                                field_config = {
+                                    'density': int(first_row.get('vector_field_density', 50)),
+                                    'color': first_row.get('vector_field_color', 'lightgray'),
+                                    'alpha': float(first_row.get('vector_field_alpha', 0.5))
+                                }
+
+                                plotter.add_vector_field(
+                                    equations, var_names, params,
+                                    [0, 1],  # var_indices для s и w
+                                    field_config
+                                )
+
+                            # Затем изоклины (если включены)
+                            isoclines_enabled = first_row.get('isoclines_enabled')
+                            if isoclines_enabled and str(isoclines_enabled).lower() in ('true', 'yes', '1'):
+                                eq1 = first_row.get('equation_1', 'x')
+                                eq2 = first_row.get('equation_2', 'y')
+                                equations = [eq1, eq2]
+                                var_names = ['s', 'w']
+
+                                params = {}
+                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
+                                for param_name in param_cols:
+                                    if param_name in first_row and first_row[param_name] is not None:
+                                        params[param_name] = first_row[param_name]
+
+                                isocline_config = {
+                                    'linestyle_ds': first_row.get('isoclines_linestyle_ds', '--'),
+                                    'linestyle_dw': first_row.get('isoclines_linestyle_dw', '--'),
+                                    'color_ds': first_row.get('isoclines_color_ds', 'black'),
+                                    'color_dw': first_row.get('isoclines_color_dw', 'darkred'),
+                                    'linewidth_ds': float(first_row.get('isoclines_linewidth_ds', 1.5)),
+                                    'linewidth_dw': float(first_row.get('isoclines_linewidth_dw', 1.5))
+                                }
+
+                                plotter.add_isoclines(
+                                    equations, var_names, params,
+                                    [0, 1],  # var_indices для s и w
+                                    isocline_config
+                                )
+
+                            # Наконец, строим траектории для каждой строки
+                            for row in rows:
                                 eq1 = row.get('equation_1', 'x')
                                 eq2 = row.get('equation_2', 'y')
                                 equations = [eq1, eq2]
-
                                 var_names = ['s', 'w']
 
                                 # Начальные условия
@@ -644,70 +712,16 @@ elif mode == "Загрузить Excel":
                                     "linestyle": linestyle_s
                                 }
 
-                                # Добавляем траекторию
-                                plotter.solve_and_plot_trajectory(
-                                    equations, var_names, ics, params,
-                                    [0, 1],  # var_indices для s и w
-                                    [t_start, t_end],
-                                    style
-                                )
-
-                        # Обработка векторного поля и изоклин для фазового портрета
-                        if graph_type == 'phase_portrait':
-                            # Векторное поле
-                            vector_field_enabled = first_row.get('vector_field_enabled')
-                            if vector_field_enabled and str(vector_field_enabled).lower() in ('true', 'yes', '1'):
-                                # Получаем параметры из первой строки для векторного поля
-                                eq1 = first_row.get('equation_1', 'x')
-                                eq2 = first_row.get('equation_2', 'y')
-                                equations = [eq1, eq2]
-                                var_names = ['s', 'w']
-
-                                params = {}
-                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
-                                for param_name in param_cols:
-                                    if param_name in first_row and first_row[param_name] is not None:
-                                        params[param_name] = first_row[param_name]
-
-                                field_config = {
-                                    'density': int(first_row.get('vector_field_density', 50)),
-                                    'color': first_row.get('vector_field_color', 'lightgray'),
-                                    'alpha': float(first_row.get('vector_field_alpha', 0.5))
-                                }
-
-                                plotter.add_vector_field(
-                                    equations, var_names, params,
-                                    [0, 1],  # var_indices для s и w
-                                    field_config
-                                )
-
-                            # Изоклины
-                            isoclines_enabled = first_row.get('isoclines_enabled')
-                            if isoclines_enabled and str(isoclines_enabled).lower() in ('true', 'yes', '1'):
-                                eq1 = first_row.get('equation_1', 'x')
-                                eq2 = first_row.get('equation_2', 'y')
-                                equations = [eq1, eq2]
-                                var_names = ['s', 'w']
-
-                                params = {}
-                                param_cols = ['a', 'b', 'h', 'alpha', 'betta', 'beta', 'c']
-                                for param_name in param_cols:
-                                    if param_name in first_row and first_row[param_name] is not None:
-                                        params[param_name] = first_row[param_name]
-
-                                isocline_config = {
-                                    'linestyle_ds': first_row.get('isoclines_linestyle_ds', '--'),
-                                    'linestyle_dw': first_row.get('isoclines_linestyle_dw', '--'),
-                                    'color_ds': first_row.get('isoclines_color_ds', 'black'),
-                                    'color_dw': first_row.get('isoclines_color_dw', 'darkred'),
-                                    'linewidth_ds': float(first_row.get('isoclines_linewidth_ds', 1.5)),
-                                    'linewidth_dw': float(first_row.get('isoclines_linewidth_dw', 1.5))
-                                }
-
-                                plotter.add_isoclines(
-                                    equations, var_names, params,
-                                    [0, 1],  # var_indices для s и w
-                                    isocline_config
+                                # Добавляем траекторию используя правильный метод
+                                plotter.solve_and_plot_phase(
+                                    equations_latex=equations,
+                                    variable_names=var_names,
+                                    initial_conditions=ics,
+                                    params=params,
+                                    t_span=[t_start, t_end],
+                                    var_indices=[0, 1],  # s и w
+                                    style=style,
+                                    solver_method=row.get('solver_method', 'RK45')
                                 )
 
                         # Настраиваем оси
@@ -731,15 +745,9 @@ elif mode == "Загрузить Excel":
                                 grid=True
                             )
                         elif graph_type == 'phase_portrait':
-                            # Для фазового портрета настраиваем xlim и ylim
-                            xlim_min = first_row.get('xlim_min', 0)
-                            xlim_max = first_row.get('xlim_max', 3)
-                            ylim_min = first_row.get('ylim_min', 0)
-                            ylim_max = first_row.get('ylim_max', 3)
-
+                            # Для фазового портрета xlim и ylim уже установлены выше
+                            # Настраиваем только подписи и сетку
                             plotter.set_axes(
-                                xlim=[xlim_min, xlim_max],
-                                ylim=[ylim_min, ylim_max],
                                 xlabel=xlabel,
                                 ylabel=ylabel,
                                 grid=True
