@@ -737,15 +737,36 @@ elif mode == "Загрузить Excel":
                     use_container_width=True
                 )
             with col3:
-                # Сохранение в библиотеку
+                # Инициализация флага диалога сохранения
+                if 'show_save_dialog' not in st.session_state:
+                    st.session_state.show_save_dialog = False
+
+                # Кнопка открытия диалога
                 if st.button("💾 В библиотеку", use_container_width=True, help="Сохранить эту конфигурацию для быстрого доступа"):
-                    # Открываем диалог для ввода имени
-                    with st.expander("Сохранить конфигурацию", expanded=True):
-                        save_name = st.text_input("Имя конфигурации", value=uploaded_file.name.replace('.xlsx', '').replace('.xls', ''))
-                        if st.button("Сохранить", key="save_confirm"):
-                            st.session_state.saved_excel_configs[save_name] = edited_df.copy()
-                            st.success(f"✅ Конфигурация '{save_name}' сохранена в библиотеке")
-                            st.rerun()
+                    st.session_state.show_save_dialog = not st.session_state.show_save_dialog
+
+            # Диалог сохранения (вне колонок, чтобы занимал всю ширину)
+            if st.session_state.get('show_save_dialog', False):
+                st.markdown("---")
+                with st.expander("💾 Сохранить конфигурацию в библиотеку", expanded=True):
+                    col_a, col_b = st.columns([3, 1])
+                    with col_a:
+                        save_name = st.text_input(
+                            "Имя конфигурации",
+                            value=uploaded_file.name.replace('.xlsx', '').replace('.xls', ''),
+                            key="save_config_name"
+                        )
+                    with col_b:
+                        st.write("")  # Отступ
+                        st.write("")  # Отступ для выравнивания
+                        if st.button("✅ Сохранить", key="save_confirm", type="primary"):
+                            if save_name and save_name.strip():
+                                st.session_state.saved_excel_configs[save_name.strip()] = edited_df.copy()
+                                st.success(f"✅ Конфигурация '{save_name.strip()}' сохранена в библиотеке")
+                                st.session_state.show_save_dialog = False
+                                st.rerun()
+                            else:
+                                st.error("⚠️ Введите имя конфигурации")
 
             st.markdown("---")
 
