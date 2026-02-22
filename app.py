@@ -643,6 +643,21 @@ elif mode == "Загрузить Excel":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("Загрузка Excel файла")
 
+    # Быстрая загрузка из библиотеки (перемещаем наверх)
+    if st.session_state.saved_excel_configs:
+        with st.expander("📚 Быстрая загрузка из библиотеки", expanded=False):
+            saved_config_name = st.selectbox(
+                "Выберите сохраненную конфигурацию",
+                ["Не выбрано"] + list(st.session_state.saved_excel_configs.keys()),
+                key="load_saved_config_top"
+            )
+            if saved_config_name != "Не выбрано":
+                if st.button(f"📂 Загрузить '{saved_config_name}'", use_container_width=True):
+                    st.session_state.edited_df = st.session_state.saved_excel_configs[saved_config_name].copy()
+                    st.session_state.current_config_name = saved_config_name
+                    st.success(f"✅ Загружена конфигурация '{saved_config_name}'")
+                    st.rerun()
+
     st.info("Загрузите таблицу с конфигурациями графиков (.xlsx или .xls)")
 
     uploaded_file = st.file_uploader(
@@ -650,6 +665,9 @@ elif mode == "Загрузить Excel":
         type=['xlsx', 'xls'],
         label_visibility="collapsed"
     )
+
+    # Проверяем есть ли данные для редактирования (из файла или из библиотеки)
+    has_data = uploaded_file is not None or 'edited_df' in st.session_state
 
     if uploaded_file:
         try:
@@ -661,7 +679,21 @@ elif mode == "Загрузить Excel":
             df = loader.load_table()
             loader.validate_table()
 
+            # Сохраняем загруженные данные в session_state
+            st.session_state.edited_df = df.copy()
+            st.session_state.current_config_name = uploaded_file.name
+            os.unlink(tmp_path)
+
             st.success(f"Загружено строк: {len(df)}")
+
+        except Exception as e:
+            st.error(f"Ошибка при загрузке файла: {str(e)}")
+
+    # Редактор и построение графиков (работает для файла И для данных из библиотеки)
+    if has_data:
+        # Получаем DataFrame для редактирования
+        if 'edited_df' in st.session_state:
+            df = st.session_state.edited_df
 
             # Интерактивный редактор таблицы с выпадающими меню
             st.markdown("### 📝 Редактор таблицы")
@@ -720,12 +752,9 @@ elif mode == "Загрузить Excel":
                         help=f"Включить/выключить {col}"
                     )
 
-            # Сохраняем отредактированные данные в session_state
-            if 'edited_df' not in st.session_state:
-                st.session_state.edited_df = df.copy()
-
+            # Редактор данных
             edited_df = st.data_editor(
-                st.session_state.edited_df,
+                df,
                 column_config=column_config,
                 num_rows="dynamic",  # Позволяет добавлять и удалять строки
                 use_container_width=True,
@@ -771,9 +800,11 @@ elif mode == "Загрузить Excel":
                 with st.expander("💾 Сохранить конфигурацию в библиотеку", expanded=True):
                     col_a, col_b = st.columns([3, 1])
                     with col_a:
+                        # Используем имя текущей конфигурации (из файла или библиотеки)
+                        default_name = st.session_state.get('current_config_name', 'config').replace('.xlsx', '').replace('.xls', '')
                         save_name = st.text_input(
                             "Имя конфигурации",
-                            value=uploaded_file.name.replace('.xlsx', '').replace('.xls', ''),
+                            value=default_name,
                             key="save_config_name"
                         )
                     with col_b:
@@ -792,21 +823,6 @@ elif mode == "Загрузить Excel":
                                 st.error("⚠️ Введите имя конфигурации")
 
             st.markdown("---")
-
-            # Быстрая загрузка из библиотеки
-            if st.session_state.saved_excel_configs:
-                st.markdown("### 📚 Быстрая загрузка из библиотеки")
-                saved_config_name = st.selectbox(
-                    "Выберите сохраненную конфигурацию",
-                    ["Не выбрано"] + list(st.session_state.saved_excel_configs.keys()),
-                    key="load_saved_config"
-                )
-                if saved_config_name != "Не выбрано":
-                    if st.button(f"📂 Загрузить '{saved_config_name}'", use_container_width=True):
-                        st.session_state.edited_df = st.session_state.saved_excel_configs[saved_config_name].copy()
-                        st.success(f"✅ Загружена конфигурация '{saved_config_name}'")
-                        st.rerun()
-                st.markdown("---")
 
             if st.button("🎨 Построить все графики", type="primary", width="stretch"):
                 # Используем отредактированные данные вместо оригинальных
@@ -1172,11 +1188,6 @@ elif mode == "Загрузить Excel":
 
                 # Удаляем временный файл с отредактированными данными
                 os.unlink(tmp_edited_path)
-
-            os.unlink(tmp_path)
-
-        except Exception as e:
-            st.error(f"Ошибка: {str(e)}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1620,8 +1631,57 @@ if st.session_state.current_graph is not None and mode == "Построить г
             width="stretch"
         )
 
+        # Кнопка сохранения с пользовательским именем
+        if 'show_rename_dialog' not in st.session_state:
+            st.session_state.show_rename_dialog = False
+
+        if st.button("💾 Сохранить как...", width="stretch"):
+            st.session_state.show_rename_dialog = not st.session_state.show_rename_dialog
+
         if st.button("Построить новый", width="stretch"):
             st.session_state.current_graph = None
+            st.session_state.show_rename_dialog = False
+
+    # Диалог переименования графика
+    if st.session_state.get('show_rename_dialog', False) and len(st.session_state.graph_history) > 0:
+        st.markdown("---")
+        with st.expander("💾 Сохранить график под новым именем", expanded=True):
+            last_graph = st.session_state.graph_history[-1]  # Последний добавленный график
+
+            new_name = st.text_input(
+                "Новое имя графика",
+                value=last_graph['name'],
+                key="rename_graph_input"
+            )
+
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("✅ Сохранить", key="rename_confirm", type="primary", use_container_width=True):
+                    if new_name and new_name.strip():
+                        # Обновляем имя последнего графика
+                        old_name = last_graph['name']
+                        old_timestamp = last_graph['timestamp']
+
+                        # Удаляем старый
+                        storage.delete_graph(old_name, old_timestamp)
+
+                        # Сохраняем с новым именем
+                        new_timestamp = datetime.now().strftime('%H:%M:%S')
+                        storage.save_graph(new_name.strip(), new_timestamp, last_graph['type'], last_graph['svg_data'])
+
+                        # Обновляем в истории
+                        st.session_state.graph_history[-1]['name'] = new_name.strip()
+                        st.session_state.graph_history[-1]['timestamp'] = new_timestamp
+
+                        st.success(f"✅ График сохранен как '{new_name.strip()}'")
+                        st.session_state.show_rename_dialog = False
+                        st.rerun()
+                    else:
+                        st.error("⚠️ Введите имя графика")
+            with col_b:
+                if st.button("❌ Отмена", key="rename_cancel", use_container_width=True):
+                    st.session_state.show_rename_dialog = False
+                    st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
