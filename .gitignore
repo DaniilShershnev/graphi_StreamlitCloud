@@ -9,3 +9,4 @@ output/*.pdf
 .DS_Store
 .vscode/
 .idea/
+.storage/

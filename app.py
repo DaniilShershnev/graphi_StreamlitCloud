@@ -10,6 +10,9 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Импорт системы постоянного хранения
+from utils.storage import PersistentStorage
+
 from core.function_plotter import FunctionPlotter
 from core.ode_plotter import ODEPlotter
 from utils.excel_loader import ExcelConfigLoader
@@ -401,13 +404,26 @@ AXIS_LABELS = {
     "y": ["y", "f(x)", "s(t)", "w(t)", "r(t)", "value"]
 }
 
-# Session state
-if 'graph_history' not in st.session_state:
-    st.session_state.graph_history = []
+# Инициализация системы постоянного хранения
+@st.cache_resource
+def get_storage():
+    """Создание единственного экземпляра хранилища"""
+    return PersistentStorage()
+
+storage = get_storage()
+
+# Session state с автозагрузкой из постоянного хранилища
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
+
+if not st.session_state.data_loaded:
+    # Загружаем данные из постоянного хранилища при первом запуске
+    st.session_state.saved_excel_configs = storage.load_excel_configs()
+    st.session_state.graph_history = storage.load_graphs()
+    st.session_state.data_loaded = True
+
 if 'current_graph' not in st.session_state:
     st.session_state.current_graph = None
-if 'saved_excel_configs' not in st.session_state:
-    st.session_state.saved_excel_configs = {}  # {name: dataframe}
 if 'saved_manual_configs' not in st.session_state:
     st.session_state.saved_manual_configs = {}  # {name: config_dict}
 
@@ -430,8 +446,10 @@ with st.sidebar:
     if st.session_state.graph_history:
         st.success(f"Построено графиков: {len(st.session_state.graph_history)}")
         if st.button("Очистить всё", width="stretch"):
+            storage.clear_all_graphs()  # Очищаем постоянное хранилище
             st.session_state.graph_history = []
             st.session_state.current_graph = None
+            st.rerun()
 
     st.markdown("---")
     st.caption("Для iPad Pro 11 дюймов")
@@ -500,6 +518,8 @@ if mode == "Мои графики":
                                 )
                             with col_b:
                                 if st.button("Удалить", width="stretch", key=f"del_{i}_{j}"):
+                                    # Удаляем из постоянного хранилища
+                                    storage.delete_graph(graph['name'], graph['timestamp'])
                                     # Находим и удаляем график из оригинального списка
                                     st.session_state.graph_history = [g for g in st.session_state.graph_history if not (g['name'] == graph['name'] and g['timestamp'] == graph['timestamp'])]
                                     st.rerun()
@@ -555,6 +575,7 @@ elif mode == "Библиотека":
                         # Удалить
                         if st.button("🗑️ Удалить", use_container_width=True, key=f"del_excel_{config_name}"):
                             del st.session_state.saved_excel_configs[config_name]
+                            storage.delete_excel_config(config_name)  # Удаляем с диска
                             st.rerun()
 
     # TAB 2: Ручные настройки (для будущего)
@@ -576,15 +597,11 @@ elif mode == "Библиотека":
         st.caption("Сохраните всю библиотеку в один файл для переноса на другое устройство")
 
         if st.button("📦 Экспортировать библиотеку", use_container_width=True):
-            library_data = {
-                'excel_configs': {},
-                'manual_configs': st.session_state.saved_manual_configs,
-                'timestamp': datetime.now().isoformat()
-            }
+            # Используем встроенную функцию экспорта
+            library_data = storage.export_library()
 
-            # Конвертируем DataFrame в dict для JSON
-            for name, df in st.session_state.saved_excel_configs.items():
-                library_data['excel_configs'][name] = df.to_dict(orient='records')
+            # Добавляем ручные настройки из session_state
+            library_data['manual_configs'] = st.session_state.saved_manual_configs
 
             library_json = json.dumps(library_data, ensure_ascii=False, indent=2)
 
@@ -604,9 +621,12 @@ elif mode == "Библиотека":
             try:
                 library_data = json.loads(uploaded_library.getvalue().decode('utf-8'))
 
-                # Восстанавливаем Excel конфигурации
-                for name, records in library_data.get('excel_configs', {}).items():
-                    st.session_state.saved_excel_configs[name] = pd.DataFrame(records)
+                # Импортируем в постоянное хранилище
+                storage.import_library(library_data, merge=False)
+
+                # Перезагружаем данные из постоянного хранилища в session_state
+                st.session_state.saved_excel_configs = storage.load_excel_configs()
+                st.session_state.graph_history = storage.load_graphs()
 
                 # Восстанавливаем ручные настройки
                 st.session_state.saved_manual_configs.update(library_data.get('manual_configs', {}))
@@ -761,7 +781,10 @@ elif mode == "Загрузить Excel":
                         st.write("")  # Отступ для выравнивания
                         if st.button("✅ Сохранить", key="save_confirm", type="primary"):
                             if save_name and save_name.strip():
+                                # Сохраняем в session_state
                                 st.session_state.saved_excel_configs[save_name.strip()] = edited_df.copy()
+                                # Сохраняем на диск для постоянного хранения
+                                storage.save_excel_config(save_name.strip(), edited_df.copy())
                                 st.success(f"✅ Конфигурация '{save_name.strip()}' сохранена в библиотеке")
                                 st.session_state.show_save_dialog = False
                                 st.rerun()
@@ -1124,12 +1147,15 @@ elif mode == "Загрузить Excel":
                             with open(tmp.name, 'rb') as f:
                                 svg_data = f.read()
 
+                            timestamp_str = datetime.now().strftime('%H:%M:%S')
                             st.session_state.graph_history.append({
                                 'name': output_file,
-                                'timestamp': datetime.now().strftime('%H:%M:%S'),
+                                'timestamp': timestamp_str,
                                 'type': graph_type,
                                 'svg_data': svg_data
                             })
+                            # Сохраняем на диск для постоянного хранения
+                            storage.save_graph(output_file, timestamp_str, graph_type, svg_data)
                             os.unlink(tmp.name)
 
                         success_count += 1
@@ -1274,12 +1300,15 @@ else:
                         with open(tmp.name, 'rb') as f:
                             svg_data = f.read()
 
+                        timestamp_str = datetime.now().strftime('%H:%M:%S')
                         st.session_state.graph_history.append({
                             'name': filename,
-                            'timestamp': datetime.now().strftime('%H:%M:%S'),
+                            'timestamp': timestamp_str,
                             'type': 'function',
                             'svg_data': svg_data
                         })
+                        # Сохраняем на диск для постоянного хранения
+                        storage.save_graph(filename, timestamp_str, 'function', svg_data)
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
@@ -1428,12 +1457,15 @@ else:
                         with open(tmp.name, 'rb') as f:
                             svg_data = f.read()
 
+                        timestamp_str = datetime.now().strftime('%H:%M:%S')
                         st.session_state.graph_history.append({
                             'name': filename_ode,
-                            'timestamp': datetime.now().strftime('%H:%M:%S'),
+                            'timestamp': timestamp_str,
                             'type': 'ode',
                             'svg_data': svg_data
                         })
+                        # Сохраняем на диск для постоянного хранения
+                        storage.save_graph(filename_ode, timestamp_str, 'ode', svg_data)
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
@@ -1544,12 +1576,15 @@ else:
                         with open(tmp.name, 'rb') as f:
                             svg_data = f.read()
 
+                        timestamp_str = datetime.now().strftime('%H:%M:%S')
                         st.session_state.graph_history.append({
                             'name': filename_pp,
-                            'timestamp': datetime.now().strftime('%H:%M:%S'),
+                            'timestamp': timestamp_str,
                             'type': 'phase',
                             'svg_data': svg_data
                         })
+                        # Сохраняем на диск для постоянного хранения
+                        storage.save_graph(filename_pp, timestamp_str, 'phase', svg_data)
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
