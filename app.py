@@ -328,6 +328,77 @@ COLOR_OPTIONS = {
     "Оливковый": "olive"
 }
 
+# Галерея готовых формул для iPad
+FORMULA_TEMPLATES = {
+    "Своя формула": "",
+    "— Степенные —": "",
+    "Квадратичная (x²)": "x^2",
+    "Кубическая (x³)": "x^3",
+    "Квадратный корень (√x)": "\\sqrt{x}",
+    "Обратная (1/x)": "1/x",
+    "— Экспоненциальные —": "",
+    "Экспонента (eˣ)": "e^{x}",
+    "Убывающая экспонента (e⁻ˣ)": "e^{-x}",
+    "— Тригонометрические —": "",
+    "Синус": "\\sin(x)",
+    "Косинус": "\\cos(x)",
+    "Тангенс": "\\tan(x)",
+    "— Комбинированные —": "",
+    "Парабола со сдвигом": "x^2 - 4*x + 3",
+    "Затухающие колебания": "e^{-x} \\cdot \\cos(x)",
+    "Гауссова кривая": "e^{-x^2}",
+    "Синус с амплитудой": "2 \\cdot \\sin(3*x)",
+}
+
+# Шаблоны систем ОДУ
+ODE_TEMPLATES = {
+    "Своя система": {
+        "equations": ["", ""],
+        "var_names": ["x", "y"],
+        "ics": [1.0, 0.0],
+        "description": ""
+    },
+    "Гармонический осциллятор": {
+        "equations": ["y", "-x"],
+        "var_names": ["x", "y"],
+        "ics": [1.0, 0.0],
+        "description": "dx/dt = y, dy/dt = -x"
+    },
+    "Затухающий осциллятор": {
+        "equations": ["y", "-x - 0.5*y"],
+        "var_names": ["x", "y"],
+        "ics": [1.0, 0.0],
+        "description": "dx/dt = y, dy/dt = -x - 0.5y"
+    },
+    "Лотка-Вольтерра (хищник-жертва)": {
+        "equations": ["x*(1 - y)", "-y*(1 - x)"],
+        "var_names": ["x", "y"],
+        "ics": [0.5, 0.5],
+        "description": "dx/dt = x(1-y), dy/dt = -y(1-x)"
+    },
+    "Ван-дер-Поль": {
+        "equations": ["y", "0.5*(1 - x^2)*y - x"],
+        "var_names": ["x", "y"],
+        "ics": [2.0, 0.0],
+        "description": "Нелинейный осциллятор с самовозбуждением"
+    },
+    "Маятник (малые углы)": {
+        "equations": ["y", "-\\sin(x)"],
+        "var_names": ["x", "y"],
+        "ics": [1.5, 0.0],
+        "description": "dx/dt = y, dy/dt = -sin(x)"
+    }
+}
+
+# Предустановленные имена переменных
+VARIABLE_NAMES = ["x", "y", "s", "w", "t", "theta", "r", "alpha", "beta", "u", "v"]
+
+# Предустановленные метки осей
+AXIS_LABELS = {
+    "x": ["x", "t", "s", "theta", "r"],
+    "y": ["y", "f(x)", "s(t)", "w(t)", "r(t)", "value"]
+}
+
 # Session state
 if 'graph_history' not in st.session_state:
     st.session_state.graph_history = []
@@ -800,12 +871,35 @@ else:
         col1, col2 = st.columns([3, 1])
 
         with col1:
-            formula = st.text_input(
-                "Формула LaTeX",
-                value="x^2",
-                placeholder="x^2 + \\\\sin(x)",
-                help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp"
+            # Галерея готовых формул
+            formula_template = st.selectbox(
+                "Выберите формулу",
+                options=list(FORMULA_TEMPLATES.keys()),
+                index=0,
+                help="Выберите из галереи или укажите свою"
             )
+
+            # Если выбран разделитель (строка начинается с —), показываем предупреждение
+            if formula_template.startswith("—"):
+                st.warning("Выберите формулу из списка ниже")
+                formula = ""
+            elif formula_template == "Своя формула":
+                formula = st.text_input(
+                    "Введите формулу",
+                    value="x^2",
+                    placeholder="x^2 + \\\\sin(x)",
+                    help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp"
+                )
+            else:
+                formula = FORMULA_TEMPLATES[formula_template]
+                st.code(formula, language="latex")
+                # Опция для редактирования
+                if st.checkbox("Редактировать формулу", key="edit_formula"):
+                    formula = st.text_input(
+                        "Формула LaTeX",
+                        value=formula,
+                        help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp"
+                    )
 
             col_a, col_b = st.columns(2)
             with col_a:
@@ -829,9 +923,17 @@ else:
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            xlabel = st.text_input("Ось X", value="x")
+            xlabel_choice = st.selectbox("Ось X", AXIS_LABELS["x"] + ["Своя метка"], index=0)
+            if xlabel_choice == "Своя метка":
+                xlabel = st.text_input("Введите метку X", value="x", label_visibility="collapsed")
+            else:
+                xlabel = xlabel_choice
         with col2:
-            ylabel = st.text_input("Ось Y", value="f(x)")
+            ylabel_choice = st.selectbox("Ось Y", AXIS_LABELS["y"] + ["Своя метка"], index=1)
+            if ylabel_choice == "Своя метка":
+                ylabel = st.text_input("Введите метку Y", value="y", label_visibility="collapsed")
+            else:
+                ylabel = ylabel_choice
         with col3:
             filename = st.text_input("Имя файла", value="function")
 
@@ -898,10 +1000,26 @@ else:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("Система ОДУ")
 
+        # Шаблоны систем ОДУ
+        template_choice = st.selectbox(
+            "Выберите шаблон системы",
+            options=list(ODE_TEMPLATES.keys()),
+            index=0,
+            help="Выберите готовую систему или создайте свою"
+        )
+
+        template = ODE_TEMPLATES[template_choice]
+        if template["description"]:
+            st.info(f"📖 {template['description']}")
+
         col1, col2 = st.columns([2, 1])
 
         with col1:
-            num_vars = st.number_input("Количество переменных", 2, 4, 2, 1)
+            # Используем num_vars из шаблона, но позволяем редактировать для "Своя система"
+            if template_choice == "Своя система":
+                num_vars = st.number_input("Количество переменных", 2, 4, 2, 1)
+            else:
+                num_vars = len(template["equations"])
 
             equations = []
             var_names = []
@@ -913,13 +1031,27 @@ else:
                 col_a, col_b, col_c, col_d = st.columns([1, 2, 1, 1])
 
                 with col_a:
-                    var = st.text_input("Имя", value=chr(120+i), key=f"var_{i}", label_visibility="collapsed")
+                    # Используем предустановленные имена переменных или из шаблона
+                    default_var = template["var_names"][i] if i < len(template["var_names"]) else VARIABLE_NAMES[i]
+                    var_choice = st.selectbox(
+                        "Имя",
+                        VARIABLE_NAMES + ["Другое"],
+                        index=VARIABLE_NAMES.index(default_var) if default_var in VARIABLE_NAMES else len(VARIABLE_NAMES),
+                        key=f"var_select_{i}",
+                        label_visibility="collapsed"
+                    )
+                    if var_choice == "Другое":
+                        var = st.text_input("Имя", value=default_var, key=f"var_{i}", label_visibility="collapsed")
+                    else:
+                        var = var_choice
                     var_names.append(var)
                 with col_b:
-                    eq = st.text_input("Уравнение", value="-x" if i==0 else "x-y", key=f"eq_{i}", label_visibility="collapsed")
+                    default_eq = template["equations"][i] if i < len(template["equations"]) else ""
+                    eq = st.text_input("Уравнение", value=default_eq, key=f"eq_{i}", label_visibility="collapsed")
                     equations.append(eq)
                 with col_c:
-                    ic = st.number_input("Нач. усл.", value=float(i+1), key=f"ic_{i}", label_visibility="collapsed")
+                    default_ic = template["ics"][i] if i < len(template["ics"]) else float(i+1)
+                    ic = st.number_input("Нач. усл.", value=default_ic, key=f"ic_{i}", label_visibility="collapsed")
                     ics.append(ic)
                 with col_d:
                     c_name = st.selectbox("Цвет", list(COLOR_OPTIONS.keys()), index=min(i, len(COLOR_OPTIONS)-1), key=f"c_{i}", label_visibility="collapsed")
@@ -933,10 +1065,25 @@ else:
             st.markdown("**Оси**")
             use_dual_y_manual = st.checkbox("Две оси Y", value=False, key="dual_y_manual",
                                            help="Первая переменная на левой оси, вторая на правой")
-            xlabel_ode = st.text_input("X", value="t", key="xlabel_ode")
-            ylabel_ode = st.text_input("Y левая", value="значение", key="ylabel_ode")
+
+            xlabel_ode_choice = st.selectbox("X", AXIS_LABELS["x"] + ["Другое"], index=1, key="xlabel_ode_select")  # t по умолчанию
+            if xlabel_ode_choice == "Другое":
+                xlabel_ode = st.text_input("Метка X", value="t", key="xlabel_ode", label_visibility="collapsed")
+            else:
+                xlabel_ode = xlabel_ode_choice
+
+            ylabel_ode_choice = st.selectbox("Y левая", AXIS_LABELS["y"] + ["Другое"], index=5, key="ylabel_ode_select")  # value по умолчанию
+            if ylabel_ode_choice == "Другое":
+                ylabel_ode = st.text_input("Метка Y", value="значение", key="ylabel_ode", label_visibility="collapsed")
+            else:
+                ylabel_ode = ylabel_ode_choice
+
             if use_dual_y_manual:
-                ylabel_right_ode = st.text_input("Y правая", value="значение 2", key="ylabel_right_ode")
+                ylabel_right_ode_choice = st.selectbox("Y правая", AXIS_LABELS["y"] + ["Другое"], index=5, key="ylabel_right_ode_select")
+                if ylabel_right_ode_choice == "Другое":
+                    ylabel_right_ode = st.text_input("Метка Y правая", value="значение 2", key="ylabel_right_ode", label_visibility="collapsed")
+                else:
+                    ylabel_right_ode = ylabel_right_ode_choice
             filename_ode = st.text_input("Файл", value="ode", key="file_ode")
 
         if st.button("Построить", type="primary", width="stretch", key="build_ode"):
@@ -1014,12 +1161,20 @@ else:
 
             col_a, col_b = st.columns(2)
             with col_a:
-                var1 = st.text_input("Переменная 1", value="x")
+                var1_choice = st.selectbox("Переменная 1", VARIABLE_NAMES + ["Другое"], index=0, key="var1_pp_select")  # x по умолчанию
+                if var1_choice == "Другое":
+                    var1 = st.text_input("Имя переменной 1", value="x", key="var1_pp", label_visibility="collapsed")
+                else:
+                    var1 = var1_choice
                 eq1 = st.text_input(f"d{var1}/dt", value="y", help="Используйте двойной слеш: \\\\sin, \\\\cos, \\\\exp")
                 ic1 = st.number_input(f"{var1}(0)", value=1.5)
 
             with col_b:
-                var2 = st.text_input("Переменная 2", value="y")
+                var2_choice = st.selectbox("Переменная 2", VARIABLE_NAMES + ["Другое"], index=1, key="var2_pp_select")  # y по умолчанию
+                if var2_choice == "Другое":
+                    var2 = st.text_input("Имя переменной 2", value="y", key="var2_pp", label_visibility="collapsed")
+                else:
+                    var2 = var2_choice
                 eq2 = st.text_input(f"d{var2}/dt", value=r"-\sin(x)", help="Используйте одинарный слеш: \\sin, \\cos, \\exp")
                 ic2 = st.number_input(f"{var2}(0)", value=0.0)
 
@@ -1039,8 +1194,18 @@ else:
             show_top_spine_pp = st.checkbox("Верхняя ось", value=False, key="show_top_pp")
             show_right_spine_pp = st.checkbox("Правая ось", value=False, key="show_right_pp")
 
-            xlabel_pp = st.text_input("Ось X", value="x", key="xlabel_pp")
-            ylabel_pp = st.text_input("Ось Y", value="y", key="ylabel_pp")
+            xlabel_pp_choice = st.selectbox("Ось X", AXIS_LABELS["x"] + ["Другое"], index=0, key="xlabel_pp_select")  # x по умолчанию
+            if xlabel_pp_choice == "Другое":
+                xlabel_pp = st.text_input("Метка X", value="x", key="xlabel_pp", label_visibility="collapsed")
+            else:
+                xlabel_pp = xlabel_pp_choice
+
+            ylabel_pp_choice = st.selectbox("Ось Y", AXIS_LABELS["y"] + ["Другое"], index=0, key="ylabel_pp_select")  # y по умолчанию
+            if ylabel_pp_choice == "Другое":
+                ylabel_pp = st.text_input("Метка Y", value="y", key="ylabel_pp", label_visibility="collapsed")
+            else:
+                ylabel_pp = ylabel_pp_choice
+
             filename_pp = st.text_input("Файл", value="phase", key="file_pp")
 
         if st.button("Построить", type="primary", width="stretch", key="build_phase"):
