@@ -774,24 +774,25 @@ elif mode == "Загрузить Excel":
                     header[data-testid="stHeader"]   { display: none !important; }
                     footer                           { display: none !important; }
                     body, .stApp                     { background: #1c1c2e !important; }
-                    .main                            { background: transparent !important; padding: 1vh 1vw !important; }
+                    .main                            { background: transparent !important; padding: 0.5vh 0.5vw !important; }
                     .main .block-container {
                         background:    white !important;
                         border-radius: 16px !important;
-                        padding:       1rem 1.5rem 2rem !important;
+                        padding:       0.5rem 0.75rem 0.75rem !important;
                         max-width:     100% !important;
-                        min-height:    96vh !important;
+                        min-height:    98vh !important;
                         box-shadow:    0 8px 40px rgba(0,0,0,0.55) !important;
                     }
+                    /* Кнопка закрытия — маленькая, справа сверху */
+                    div[data-testid="stHorizontalBlock"]:has(#btn_close_modal) {
+                        position: absolute; top: 8px; right: 8px; z-index: 1000;
+                    }
                 </style>""", unsafe_allow_html=True)
-                _mc1, _mc2 = st.columns([9, 1])
-                with _mc1:
-                    st.markdown("### 📝 Редактор таблицы")
-                with _mc2:
+                _, _close_col = st.columns([20, 1])
+                with _close_col:
                     if st.button("✕", use_container_width=True, key="btn_close_modal"):
                         st.session_state.table_modal = False
                         st.rerun()
-                st.caption("Стилус: выделить диапазон → тап на последнюю ячейку или кнопка ↓ | Палец: клавиатура")
             else:
                 # Обычный режим: заголовок + кнопка открытия редактора
                 _nc1, _nc2 = st.columns([8, 2])
@@ -1150,6 +1151,10 @@ function(params) {
 
             # Обновляем session_state
             st.session_state.edited_df = edited_df
+
+            # В модальном режиме — только таблица, больше ничего
+            if st.session_state.get('table_modal', False):
+                st.stop()
 
             # Кнопки управления
             col1, col2, col3 = st.columns(3)
