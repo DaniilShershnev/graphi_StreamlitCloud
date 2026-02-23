@@ -763,30 +763,45 @@ elif mode == "Загрузить Excel":
         if 'edited_df' in st.session_state:
             df = st.session_state.edited_df
 
-            # Редактор таблицы — с возможностью развернуть на весь экран
-            if 'table_fullscreen' not in st.session_state:
-                st.session_state.table_fullscreen = False
+            # Редактор таблицы — кнопка "Открыть редактор" открывает модальное окно-накладку
+            if 'table_modal' not in st.session_state:
+                st.session_state.table_modal = False
 
-            if st.session_state.table_fullscreen:
+            if st.session_state.table_modal:
+                # === Модальное окно: тёмный фон + белая карточка поверх ===
                 st.markdown("""<style>
                     section[data-testid="stSidebar"] { display: none !important; }
-                    .main .block-container { max-width: 100% !important; padding: 0.5rem 1rem !important; }
+                    header[data-testid="stHeader"]   { display: none !important; }
+                    footer                           { display: none !important; }
+                    body, .stApp                     { background: #1c1c2e !important; }
+                    .main                            { background: transparent !important; padding: 1vh 1vw !important; }
+                    .main .block-container {
+                        background:    white !important;
+                        border-radius: 16px !important;
+                        padding:       1rem 1.5rem 2rem !important;
+                        max-width:     100% !important;
+                        min-height:    96vh !important;
+                        box-shadow:    0 8px 40px rgba(0,0,0,0.55) !important;
+                    }
                 </style>""", unsafe_allow_html=True)
-
-            _hcol1, _hcol2 = st.columns([7, 1])
-            with _hcol1:
-                st.markdown("### 📝 Редактор таблицы")
-            with _hcol2:
-                if st.session_state.table_fullscreen:
-                    if st.button("✕ Свернуть", use_container_width=True, key="btn_shrink_tbl"):
-                        st.session_state.table_fullscreen = False
+                _mc1, _mc2 = st.columns([9, 1])
+                with _mc1:
+                    st.markdown("### 📝 Редактор таблицы")
+                with _mc2:
+                    if st.button("✕", use_container_width=True, key="btn_close_modal"):
+                        st.session_state.table_modal = False
                         st.rerun()
-                else:
-                    if st.button("⛶ Весь экран", use_container_width=True, key="btn_expand_tbl"):
-                        st.session_state.table_fullscreen = True
+                st.caption("Стилус: выделить диапазон → тап на последнюю ячейку или кнопка ↓ | Палец: клавиатура")
+            else:
+                # Обычный режим: заголовок + кнопка открытия редактора
+                _nc1, _nc2 = st.columns([8, 2])
+                with _nc1:
+                    st.markdown("### 📝 Редактор таблицы")
+                with _nc2:
+                    if st.button("⛶ Открыть редактор", use_container_width=True, key="btn_open_modal"):
+                        st.session_state.table_modal = True
                         st.rerun()
-
-            st.caption("Стилус: выделение + растягивание данных (fill handle) | Палец: редактирование текста")
+                st.caption("Стилус: выделить диапазон → тап на последнюю ячейку | Палец: редактирование текста")
 
             color_options_excel = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow", "black", "gray", "brown", "lime", "navy", "maroon", "olive", "teal", "coral", "gold", "darkred", "deepskyblue", "crimson", "darkgreen", "indigo", "violet", "steelblue", "tomato", "darkorange", "lightgreen", "lightskyblue", "slategray"]
             linestyle_options = ["-", "--", ":", "-."]
@@ -799,7 +814,7 @@ elif mode == "Загрузить Excel":
                                  'isoclines_linestyle_ds', 'isoclines_linestyle_dw']
             select_cols_type  = ['graph_type', 'type']
 
-            _tbl_height = 700 if st.session_state.get('table_fullscreen', False) else 420
+            _tbl_height = 700 if st.session_state.get('table_modal', False) else 420
 
             if AGGRID_AVAILABLE:
                 # --- AgGrid с fill handle (pen-only) и номерами строк ---
@@ -902,9 +917,9 @@ function(params) {
     var fillBtn = document.createElement('button');
     fillBtn.textContent = '↓ Заполнить';
     fillBtn.style.cssText = [
-        'position:fixed', 'bottom:18px', 'right:18px', 'z-index:9999',
-        'background:#1976d2', 'color:white', 'border:none', 'border-radius:12px',
-        'padding:16px 26px', 'font-size:18px', 'font-weight:700',
+        'position:fixed', 'top:54px', 'right:10px', 'z-index:9999',
+        'background:#1976d2', 'color:white', 'border:none', 'border-radius:10px',
+        'padding:10px 18px', 'font-size:15px', 'font-weight:700',
         'cursor:pointer', 'display:none',
         'box-shadow:0 4px 18px rgba(0,0,0,0.45)',
         '-webkit-tap-highlight-color:transparent',
