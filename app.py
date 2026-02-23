@@ -359,6 +359,8 @@ st.markdown("""
     var obs = new MutationObserver(noKeyboardOnSelects);
     obs.observe(document.body, {childList: true, subtree: true});
     noKeyboardOnSelects();
+    // Применяем перед каждым касанием — устраняет race condition при открытии expander
+    document.addEventListener('pointerdown', noKeyboardOnSelects, true);
 })();
 </script>
 """, unsafe_allow_html=True)
@@ -761,8 +763,29 @@ elif mode == "Загрузить Excel":
         if 'edited_df' in st.session_state:
             df = st.session_state.edited_df
 
-            # Редактор таблицы
-            st.markdown("### 📝 Редактор таблицы")
+            # Редактор таблицы — с возможностью развернуть на весь экран
+            if 'table_fullscreen' not in st.session_state:
+                st.session_state.table_fullscreen = False
+
+            if st.session_state.table_fullscreen:
+                st.markdown("""<style>
+                    section[data-testid="stSidebar"] { display: none !important; }
+                    .main .block-container { max-width: 100% !important; padding: 0.5rem 1rem !important; }
+                </style>""", unsafe_allow_html=True)
+
+            _hcol1, _hcol2 = st.columns([7, 1])
+            with _hcol1:
+                st.markdown("### 📝 Редактор таблицы")
+            with _hcol2:
+                if st.session_state.table_fullscreen:
+                    if st.button("✕ Свернуть", use_container_width=True, key="btn_shrink_tbl"):
+                        st.session_state.table_fullscreen = False
+                        st.rerun()
+                else:
+                    if st.button("⛶ Весь экран", use_container_width=True, key="btn_expand_tbl"):
+                        st.session_state.table_fullscreen = True
+                        st.rerun()
+
             st.caption("Стилус: выделение + растягивание данных (fill handle) | Палец: редактирование текста")
 
             color_options_excel = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow", "black", "gray", "brown", "lime", "navy", "maroon", "olive", "teal", "coral", "gold", "darkred", "deepskyblue", "crimson", "darkgreen", "indigo", "violet", "steelblue", "tomato", "darkorange", "lightgreen", "lightskyblue", "slategray"]
@@ -775,6 +798,8 @@ elif mode == "Загрузить Excel":
             select_cols_ls    = ['linestyle', 'line_style', 'ls', 'linestyle_s', 'linestyle_w',
                                  'isoclines_linestyle_ds', 'isoclines_linestyle_dw']
             select_cols_type  = ['graph_type', 'type']
+
+            _tbl_height = 700 if st.session_state.get('table_fullscreen', False) else 420
 
             if AGGRID_AVAILABLE:
                 # --- AgGrid с fill handle (pen-only) и номерами строк ---
@@ -819,85 +844,126 @@ elif mode == "Загрузить Excel":
 function(params) {
     var api = params.api;
     var lastPointerType = 'touch';
-    var penDragActive   = false;
 
-    // Отслеживаем тип указателя
+    // === Тип указателя ===
     document.addEventListener('pointerdown', function(e) {
         lastPointerType = e.pointerType || 'touch';
     }, true);
 
-    // Стилус в ячейке → без клавиатуры; палец → с клавиатурой
+    // === Клавиатура: стилус → без, палец → с ===
     document.addEventListener('focusin', function(e) {
         var el = e.target;
         if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
         if (lastPointerType === 'pen') {
             el.setAttribute('inputmode', 'none');
-        } else if (lastPointerType === 'touch') {
+        } else {
             el.removeAttribute('inputmode');
             el.removeAttribute('readonly');
         }
     }, true);
 
-    // Fill handle: мост pen pointer → mouse events (AG Grid слушает только mouse)
+    // === FILL HANDLE — прямая реализация через AG Grid API (iOS не поддерж. synthetic mouse) ===
+    var penFill = null;
+
+    // Блокируем касание пальцем на fill handle
+    document.addEventListener('pointerdown', function(e) {
+        var h = e.target.closest && e.target.closest('.ag-fill-handle');
+        if (h && e.pointerType !== 'pen') {
+            e.stopImmediatePropagation(); e.preventDefault();
+        }
+    }, true);
+
+    // Стилус на fill handle → записываем исходный диапазон
     document.addEventListener('pointerdown', function(e) {
         if (e.pointerType !== 'pen') return;
-        var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
-        if (!handle) return;
-        e.preventDefault();
-        e.stopPropagation();
-        penDragActive = true;
-        handle.dispatchEvent(new MouseEvent('mousedown', {
-            bubbles: true, cancelable: true,
-            clientX: e.clientX, clientY: e.clientY,
-            button: 0, buttons: 1
-        }));
+        var h = e.target.closest && e.target.closest('.ag-fill-handle');
+        if (!h) return;
+        e.preventDefault(); e.stopPropagation();
+        var ranges = api.getCellRanges();
+        if (!ranges || !ranges.length) return;
+        var rng = ranges[0];
+        var r1 = rng.startRow.rowIndex, r2 = rng.endRow.rowIndex;
+        if (r1 > r2) { var t = r1; r1 = r2; r2 = t; }
+        penFill = {
+            rowStart: r1, rowEnd: r2,
+            cols: rng.columns.map(function(c) { return c.getColId(); }),
+            targetRow: r2
+        };
+        try { h.setPointerCapture(e.pointerId); } catch(ex){}
     }, true);
 
+    // Отслеживаем строку под стилусом во время перетаскивания
     document.addEventListener('pointermove', function(e) {
-        if (e.pointerType !== 'pen' || !penDragActive) return;
-        document.dispatchEvent(new MouseEvent('mousemove', {
-            bubbles: true, cancelable: true,
-            clientX: e.clientX, clientY: e.clientY,
-            button: 0, buttons: 1
-        }));
+        if (e.pointerType !== 'pen' || !penFill) return;
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        var rowEl = el && el.closest && el.closest('.ag-row[row-index]');
+        if (rowEl) penFill.targetRow = parseInt(rowEl.getAttribute('row-index'), 10);
     }, true);
 
+    // Стилус поднят → заполняем ячейки значением из источника
     document.addEventListener('pointerup', function(e) {
-        if (e.pointerType !== 'pen' || !penDragActive) return;
-        penDragActive = false;
-        document.dispatchEvent(new MouseEvent('mouseup', {
-            bubbles: true, cancelable: true,
-            clientX: e.clientX, clientY: e.clientY,
-            button: 0
-        }));
-    }, true);
-
-    // Fill handle: блокируем drag пальцем
-    document.addEventListener('pointerdown', function(e) {
-        var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
-        if (handle && e.pointerType === 'touch') {
-            e.stopImmediatePropagation();
-            e.preventDefault();
+        if (e.pointerType !== 'pen' || !penFill) return;
+        var state = penFill;
+        penFill = null;
+        api.stopEditing();
+        var fillTo = state.targetRow;
+        if (fillTo > state.rowEnd) {
+            // Заполняем вниз
+            var src = api.getDisplayedRowAtIndex(state.rowEnd);
+            if (!src) return;
+            for (var r = state.rowEnd + 1; r <= fillTo; r++) {
+                var nd = api.getDisplayedRowAtIndex(r);
+                if (!nd) continue;
+                state.cols.forEach(function(col) {
+                    if (col === '#') return;
+                    nd.setDataValue(col, src.data[col]);
+                });
+            }
+        } else if (fillTo < state.rowStart) {
+            // Заполняем вверх
+            var src = api.getDisplayedRowAtIndex(state.rowStart);
+            if (!src) return;
+            for (var r = fillTo; r < state.rowStart; r++) {
+                var nd = api.getDisplayedRowAtIndex(r);
+                if (!nd) continue;
+                state.cols.forEach(function(col) {
+                    if (col === '#') return;
+                    nd.setDataValue(col, src.data[col]);
+                });
+            }
         }
+        api.refreshCells({ force: true });
     }, true);
 
-    // Сжатие стилуса (barrel button=1) → открыть редактор ячейки
-    document.addEventListener('pointerdown', function(e) {
-        if (e.pointerType !== 'pen' || e.button !== 1) return;
+    // === СЖАТИЕ APPLE PENCIL PRO → открыть редактор ячейки ===
+    function openCellEditor() {
         var cell = api.getFocusedCell();
-        if (cell) {
-            api.startEditingCell({ rowIndex: cell.rowIndex, colKey: cell.column.colId });
+        if (!cell) return;
+        api.startEditingCell({ rowIndex: cell.rowIndex, colKey: cell.column.colId });
+        // Для select/dropdown ячеек — дополнительно фокусируем нативный элемент
+        setTimeout(function() {
+            var el = document.querySelector(
+                '.ag-popup-editor select, .ag-popup-editor input, ' +
+                '.ag-cell-editor select, .ag-cell-editor input'
+            );
+            if (el) { el.removeAttribute('inputmode'); el.focus(); el.click(); }
+        }, 40);
+    }
+
+    // button=1 или button=2 (разные версии iOS/Pencil)
+    document.addEventListener('pointerdown', function(e) {
+        if (e.pointerType !== 'pen') return;
+        if (e.button === 1 || e.button === 2) {
+            e.preventDefault();
+            openCellEditor();
         }
     }, true);
 
-    // contextmenu от стилуса (альтернативный сигнал сжатия в некоторых версиях iOS)
+    // contextmenu как альтернатива (некоторые версии iOS)
     document.addEventListener('contextmenu', function(e) {
         if (lastPointerType !== 'pen') return;
         e.preventDefault();
-        var cell = api.getFocusedCell();
-        if (cell) {
-            api.startEditingCell({ rowIndex: cell.rowIndex, colKey: cell.column.colId });
-        }
+        openCellEditor();
     }, true);
 }
 """)
@@ -935,7 +1001,7 @@ function(params) {
                     gridOptions=gridOptions,
                     update_mode=GridUpdateMode.VALUE_CHANGED,
                     fit_columns_on_grid_load=False,
-                    height=420,
+                    height=_tbl_height,
                     allow_unsafe_jscode=True,
                     enable_enterprise_modules=True,
                     key="excel_editor_aggrid",
