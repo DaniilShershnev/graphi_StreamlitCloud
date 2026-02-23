@@ -342,31 +342,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Управление клавиатурой и AG Grid fill handle (стилус vs палец)
+# Глобальный JS: только подавление клавиатуры в selectbox/combobox главного фрейма
+# (AG Grid находится в iframe — его логика перенесена в onGridReady)
 st.markdown("""
-<style>
-    /* Fill handle крупнее — удобно попасть стилусом */
-    .ag-fill-handle {
-        width: 14px !important;
-        height: 14px !important;
-        bottom: -7px !important;
-        right: -7px !important;
-        border-radius: 3px !important;
-        cursor: crosshair !important;
-        touch-action: none !important;
-    }
-</style>
 <script>
 (function() {
-    var lastPointerType = 'touch';
-    var penDragActive   = false;
-
-    // Отслеживаем тип указателя глобально
-    document.addEventListener('pointerdown', function(e) {
-        lastPointerType = e.pointerType || 'touch';
-    }, true);
-
-    // 1. Selectbox/combobox — клавиатура никогда не открывается
     function noKeyboardOnSelects() {
         var attrs = ['inputmode', 'readonly', 'autocomplete', 'autocorrect', 'autocapitalize', 'spellcheck'];
         var vals  = ['none',      'true',     'off',          'off',         'none',            'false'];
@@ -376,95 +356,9 @@ st.markdown("""
             attrs.forEach(function(a, i) { el.setAttribute(a, vals[i]); });
         });
     }
-
-    // 2. AG Grid ячейки: стилус — без клавиатуры, палец — с клавиатурой
-    document.addEventListener('focusin', function(e) {
-        var el = e.target;
-        if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
-        if (!el.closest('.ag-root-wrapper')) return;
-        if (lastPointerType === 'pen') {
-            el.setAttribute('inputmode', 'none');
-            el.setAttribute('autocomplete', 'off');
-        } else if (lastPointerType === 'touch') {
-            el.removeAttribute('inputmode');
-            el.removeAttribute('readonly');
-        }
-    }, true);
-
-    // 3. Fill handle: мост pen pointer → mouse events
-    //    AG Grid использует mouse events внутри — pointer events от стилуса нужно конвертировать
-    document.addEventListener('pointerdown', function(e) {
-        if (e.pointerType !== 'pen') return;
-        var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
-        if (!handle) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-        penDragActive = true;
-
-        handle.dispatchEvent(new MouseEvent('mousedown', {
-            bubbles: true, cancelable: true,
-            clientX: e.clientX, clientY: e.clientY,
-            button: 0, buttons: 1
-        }));
-    }, true);
-
-    document.addEventListener('pointermove', function(e) {
-        if (e.pointerType !== 'pen' || !penDragActive) return;
-        document.dispatchEvent(new MouseEvent('mousemove', {
-            bubbles: true, cancelable: true,
-            clientX: e.clientX, clientY: e.clientY,
-            button: 0, buttons: 1
-        }));
-    }, true);
-
-    document.addEventListener('pointerup', function(e) {
-        if (e.pointerType !== 'pen' || !penDragActive) return;
-        penDragActive = false;
-        document.dispatchEvent(new MouseEvent('mouseup', {
-            bubbles: true, cancelable: true,
-            clientX: e.clientX, clientY: e.clientY,
-            button: 0
-        }));
-    }, true);
-
-    // 4. Fill handle: блокируем drag пальцем (только стилус)
-    function setupFillHandlePenOnly() {
-        document.querySelectorAll('.ag-root-wrapper').forEach(function(grid) {
-            if (grid._penFillSet) return;
-            grid._penFillSet = true;
-            grid.addEventListener('pointerdown', function(e) {
-                var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
-                if (handle && e.pointerType === 'touch') {
-                    e.stopImmediatePropagation();
-                    e.preventDefault();
-                }
-            }, true);
-        });
-    }
-
-    // 5. Сжатие стилуса (barrel button, button=1) → открыть редактор выбранной ячейки
-    document.addEventListener('pointerdown', function(e) {
-        if (e.pointerType !== 'pen' || e.button !== 1) return;
-        var api = window._agGridApi;
-        if (!api) return;
-        var cell = api.getFocusedCell();
-        if (cell) {
-            api.startEditingCell({
-                rowIndex: cell.rowIndex,
-                colKey: cell.column.colId
-            });
-        }
-    }, true);
-
-    var obs = new MutationObserver(function() {
-        noKeyboardOnSelects();
-        setupFillHandlePenOnly();
-    });
+    var obs = new MutationObserver(noKeyboardOnSelects);
     obs.observe(document.body, {childList: true, subtree: true});
-
     noKeyboardOnSelects();
-    setInterval(setupFillHandlePenOnly, 800);
 })();
 </script>
 """, unsafe_allow_html=True)
@@ -915,18 +809,112 @@ elif mode == "Загрузить Excel":
                     enableRangeSelection=True,
                     enableFillHandle=True,
                     fillHandleDirection='xy',
-                    rowSelection='multiple',
-                    suppressRowClickSelection=True,
                     animateRows=False,
+                    # rowSelection намеренно убран — конфликтует с range selection (fill handle)
                 )
                 gridOptions = gb.build()
 
-                # Сохраняем AG Grid API в window для доступа из JS (squeeze, fill handle)
+                # Вся логика стилуса — внутри onGridReady, который исполняется в iframe
                 gridOptions['onGridReady'] = JsCode("""
 function(params) {
-    window._agGridApi = params.api;
+    var api = params.api;
+    var lastPointerType = 'touch';
+    var penDragActive   = false;
+
+    // Отслеживаем тип указателя
+    document.addEventListener('pointerdown', function(e) {
+        lastPointerType = e.pointerType || 'touch';
+    }, true);
+
+    // Стилус в ячейке → без клавиатуры; палец → с клавиатурой
+    document.addEventListener('focusin', function(e) {
+        var el = e.target;
+        if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+        if (lastPointerType === 'pen') {
+            el.setAttribute('inputmode', 'none');
+        } else if (lastPointerType === 'touch') {
+            el.removeAttribute('inputmode');
+            el.removeAttribute('readonly');
+        }
+    }, true);
+
+    // Fill handle: мост pen pointer → mouse events (AG Grid слушает только mouse)
+    document.addEventListener('pointerdown', function(e) {
+        if (e.pointerType !== 'pen') return;
+        var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
+        if (!handle) return;
+        e.preventDefault();
+        e.stopPropagation();
+        penDragActive = true;
+        handle.dispatchEvent(new MouseEvent('mousedown', {
+            bubbles: true, cancelable: true,
+            clientX: e.clientX, clientY: e.clientY,
+            button: 0, buttons: 1
+        }));
+    }, true);
+
+    document.addEventListener('pointermove', function(e) {
+        if (e.pointerType !== 'pen' || !penDragActive) return;
+        document.dispatchEvent(new MouseEvent('mousemove', {
+            bubbles: true, cancelable: true,
+            clientX: e.clientX, clientY: e.clientY,
+            button: 0, buttons: 1
+        }));
+    }, true);
+
+    document.addEventListener('pointerup', function(e) {
+        if (e.pointerType !== 'pen' || !penDragActive) return;
+        penDragActive = false;
+        document.dispatchEvent(new MouseEvent('mouseup', {
+            bubbles: true, cancelable: true,
+            clientX: e.clientX, clientY: e.clientY,
+            button: 0
+        }));
+    }, true);
+
+    // Fill handle: блокируем drag пальцем
+    document.addEventListener('pointerdown', function(e) {
+        var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
+        if (handle && e.pointerType === 'touch') {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+        }
+    }, true);
+
+    // Сжатие стилуса (barrel button=1) → открыть редактор ячейки
+    document.addEventListener('pointerdown', function(e) {
+        if (e.pointerType !== 'pen' || e.button !== 1) return;
+        var cell = api.getFocusedCell();
+        if (cell) {
+            api.startEditingCell({ rowIndex: cell.rowIndex, colKey: cell.column.colId });
+        }
+    }, true);
+
+    // contextmenu от стилуса (альтернативный сигнал сжатия в некоторых версиях iOS)
+    document.addEventListener('contextmenu', function(e) {
+        if (lastPointerType !== 'pen') return;
+        e.preventDefault();
+        var cell = api.getFocusedCell();
+        if (cell) {
+            api.startEditingCell({ rowIndex: cell.rowIndex, colKey: cell.column.colId });
+        }
+    }, true);
 }
 """)
+                # CSS применяется внутри iframe через custom_css
+                ag_custom_css = {
+                    ".ag-fill-handle": {
+                        "width": "16px !important",
+                        "height": "16px !important",
+                        "bottom": "-8px !important",
+                        "right": "-8px !important",
+                        "border-radius": "4px !important",
+                        "cursor": "crosshair !important",
+                        "touch-action": "none !important",
+                        "z-index": "100 !important",
+                        "display": "block !important",
+                    }
+                }
 
                 grid_response = AgGrid(
                     df_display,
@@ -937,6 +925,7 @@ function(params) {
                     allow_unsafe_jscode=True,
                     key="excel_editor_aggrid",
                     theme='alpine',
+                    custom_css=ag_custom_css,
                 )
 
                 edited_df = pd.DataFrame(grid_response['data'])
