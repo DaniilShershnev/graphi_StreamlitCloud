@@ -844,8 +844,9 @@ elif mode == "Загрузить Excel":
 function(params) {
     var api = params.api;
     var lastPointerType = 'touch';
+    var penMoveCount = 0;  // счётчик движений стилуса — отличает tap от drag
 
-    // === Авто-ширина столбцов по содержимому (как в Excel) ===
+    // === Авто-ширина столбцов по содержимому ===
     setTimeout(function() {
         try {
             var colApi = params.columnApi || params.api;
@@ -855,9 +856,13 @@ function(params) {
         }
     }, 250);
 
-    // === Тип указателя ===
+    // === Тип указателя + сброс счётчика движений ===
     document.addEventListener('pointerdown', function(e) {
         lastPointerType = e.pointerType || 'touch';
+        if (e.pointerType === 'pen') penMoveCount = 0;
+    }, true);
+    document.addEventListener('pointermove', function(e) {
+        if (e.pointerType === 'pen') penMoveCount++;
     }, true);
 
     // === Клавиатура: стилус → без, палец → с ===
@@ -872,19 +877,107 @@ function(params) {
         }
     }, true);
 
-    // === FILL HANDLE — прямая реализация через AG Grid API ===
-    var penFill = null;
+    // =========================================================
+    // === ЗАПОЛНЕНИЕ ЯЧЕЕК — три способа взаимодействия     ===
+    // =========================================================
 
-    // Блокируем касание пальцем на fill handle
-    document.addEventListener('pointerdown', function(e) {
-        var h = e.target.closest && e.target.closest('.ag-fill-handle');
-        if (h && e.pointerType !== 'pen') {
-            e.stopImmediatePropagation(); e.preventDefault();
+    // Общая функция заполнения диапазона значением первой строки
+    function execFill(r1, r2, cols) {
+        var srcNode = api.getDisplayedRowAtIndex(r1);
+        if (!srcNode) return;
+        api.stopEditing();
+        for (var r = r1 + 1; r <= r2; r++) {
+            var nd = api.getDisplayedRowAtIndex(r);
+            if (!nd) continue;
+            cols.forEach(function(col) {
+                if (col !== '#') nd.setDataValue(col, srcNode.data[col]);
+            });
         }
+        api.refreshCells({ force: true });
+        savedRange = null;
+        fillBtn.style.display = 'none';
+    }
+
+    // --- Плавающая кнопка "↓ Заполнить" (появляется при выделении диапазона) ---
+    var fillBtn = document.createElement('button');
+    fillBtn.textContent = '↓ Заполнить';
+    fillBtn.style.cssText = [
+        'position:fixed', 'bottom:18px', 'right:18px', 'z-index:9999',
+        'background:#1976d2', 'color:white', 'border:none', 'border-radius:12px',
+        'padding:16px 26px', 'font-size:18px', 'font-weight:700',
+        'cursor:pointer', 'display:none',
+        'box-shadow:0 4px 18px rgba(0,0,0,0.45)',
+        '-webkit-tap-highlight-color:transparent',
+        'touch-action:manipulation'
+    ].join(';');
+    document.body.appendChild(fillBtn);
+
+    // Сохранённый диапазон (для кнопки и "тап на последнюю ячейку")
+    var savedRange = null;
+
+    fillBtn.addEventListener('pointerup', function(e) {
+        e.stopPropagation();
+        if (savedRange) execFill(savedRange.r1, savedRange.r2, savedRange.cols);
+    });
+    fillBtn.addEventListener('click', function() {
+        if (savedRange) execFill(savedRange.r1, savedRange.r2, savedRange.cols);
+    });
+
+    // Слушаем изменение диапазона → показываем/скрываем кнопку
+    try {
+        api.addEventListener('rangeSelectionChanged', function() {
+            var ranges = api.getCellRanges();
+            if (ranges && ranges.length) {
+                var rng = ranges[0];
+                var r1 = Math.min(rng.startRow.rowIndex, rng.endRow.rowIndex);
+                var r2 = Math.max(rng.startRow.rowIndex, rng.endRow.rowIndex);
+                if (r2 > r1) {
+                    savedRange = { r1: r1, r2: r2, cols: rng.columns.map(function(c) { return c.getColId(); }) };
+                    fillBtn.style.display = 'block';
+                } else {
+                    fillBtn.style.display = 'none';
+                    // savedRange не очищаем — нужен для "тап на последнюю ячейку"
+                }
+            } else {
+                fillBtn.style.display = 'none';
+            }
+        });
+    } catch(ex) {}
+
+    // --- Способ 2: выделить диапазон, тапнуть на последнюю ячейку → заполнить ---
+    // pointerup с минимальным движением (tap) на последней строке savedRange
+    document.addEventListener('pointerup', function(e) {
+        if (e.pointerType !== 'pen') return;
+        if (!savedRange) return;
+        if (penMoveCount > 6) return; // это был drag, не tap
+
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        if (!el) return;
+        var rowEl = el.closest && el.closest('.ag-row[row-index]');
+        if (!rowEl) { savedRange = null; fillBtn.style.display = 'none'; return; }
+
+        var tappedRow = parseInt(rowEl.getAttribute('row-index'), 10);
+        if (isNaN(tappedRow)) return;
+
+        if (tappedRow === savedRange.r2) {
+            // Тап на последнюю строку диапазона → заполняем
+            execFill(savedRange.r1, savedRange.r2, savedRange.cols);
+        } else if (tappedRow < savedRange.r1 || tappedRow > savedRange.r2) {
+            // Тап вне диапазона → сбрасываем
+            savedRange = null;
+            fillBtn.style.display = 'none';
+        }
+        // Тап внутри диапазона (не последняя) → ничего не делаем, savedRange остаётся
     }, true);
 
-    // Стилус на fill handle → запоминаем исходный диапазон
-    // НЕ вызываем setPointerCapture — он ломает elementFromPoint в pointermove
+    // --- Способ 3: drag от fill handle уголка (для совместимости) ---
+    var penFill = null;
+
+    document.addEventListener('pointerdown', function(e) {
+        var h = e.target.closest && e.target.closest('.ag-fill-handle');
+        if (h && e.pointerType !== 'pen') { e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
+
     document.addEventListener('pointerdown', function(e) {
         if (e.pointerType !== 'pen') return;
         var h = e.target.closest && e.target.closest('.ag-fill-handle');
@@ -895,24 +988,14 @@ function(params) {
         var rng = ranges[0];
         var r1 = rng.startRow.rowIndex, r2 = rng.endRow.rowIndex;
         if (r1 > r2) { var t = r1; r1 = r2; r2 = t; }
-        penFill = {
-            rowStart: r1, rowEnd: r2,
-            cols: rng.columns.map(function(c) { return c.getColId(); }),
-            targetRow: r2
-        };
+        penFill = { rowStart: r1, rowEnd: r2, cols: rng.columns.map(function(c) { return c.getColId(); }), targetRow: r2 };
     }, true);
 
-    // Отслеживаем строку под стилусом двумя методами
     document.addEventListener('pointermove', function(e) {
         if (e.pointerType !== 'pen' || !penFill) return;
-        // Метод 1: elementFromPoint
         var el = document.elementFromPoint(e.clientX, e.clientY);
         var rowEl = el && el.closest && el.closest('.ag-row[row-index]');
-        if (rowEl) {
-            penFill.targetRow = parseInt(rowEl.getAttribute('row-index'), 10);
-            return;
-        }
-        // Метод 2: bounding rect всех видимых строк
+        if (rowEl) { penFill.targetRow = parseInt(rowEl.getAttribute('row-index'), 10); return; }
         var rows = document.querySelectorAll('.ag-row[row-index]');
         for (var i = 0; i < rows.length; i++) {
             var rect = rows[i].getBoundingClientRect();
@@ -923,53 +1006,27 @@ function(params) {
         }
     }, true);
 
-    // Стилус поднят → заполняем ячейки
     document.addEventListener('pointerup', function(e) {
         if (e.pointerType !== 'pen' || !penFill) return;
         var state = penFill;
         penFill = null;
-        api.stopEditing();
-
-        // Задержка: AG Grid Enterprise обновляет диапазон после pointerup
         setTimeout(function() {
-            var fillFrom, fillTo, srcRowIdx;
-
-            // Приоритет 1: текущий диапазон из AG Grid (Enterprise мог расширить его)
             var curRanges = api.getCellRanges();
+            var fillFrom, fillTo, srcRowIdx;
             if (curRanges && curRanges.length) {
                 var cr = curRanges[0];
                 var cr1 = Math.min(cr.startRow.rowIndex, cr.endRow.rowIndex);
                 var cr2 = Math.max(cr.startRow.rowIndex, cr.endRow.rowIndex);
-                if (cr2 > state.rowEnd) {
-                    srcRowIdx = state.rowEnd; fillFrom = state.rowEnd + 1; fillTo = cr2;
-                } else if (cr1 < state.rowStart) {
-                    srcRowIdx = state.rowStart; fillFrom = cr1; fillTo = state.rowStart - 1;
-                }
+                if (cr2 > state.rowEnd) { srcRowIdx = state.rowEnd; fillFrom = state.rowEnd + 1; fillTo = cr2; }
+                else if (cr1 < state.rowStart) { srcRowIdx = state.rowStart; fillFrom = cr1; fillTo = state.rowStart - 1; }
             }
-
-            // Приоритет 2: отслеживаемая targetRow из pointermove
             if (fillFrom === undefined) {
-                if (state.targetRow > state.rowEnd) {
-                    srcRowIdx = state.rowEnd; fillFrom = state.rowEnd + 1; fillTo = state.targetRow;
-                } else if (state.targetRow < state.rowStart) {
-                    srcRowIdx = state.rowStart; fillFrom = state.targetRow; fillTo = state.rowStart - 1;
-                }
+                if (state.targetRow > state.rowEnd) { srcRowIdx = state.rowEnd; fillFrom = state.rowEnd + 1; fillTo = state.targetRow; }
+                else if (state.targetRow < state.rowStart) { srcRowIdx = state.rowStart; fillFrom = state.targetRow; fillTo = state.rowStart - 1; }
             }
-
-            if (fillFrom === undefined || fillTo < fillFrom) return;
-
-            var src = api.getDisplayedRowAtIndex(srcRowIdx);
-            if (!src) return;
-
-            for (var r = fillFrom; r <= fillTo; r++) {
-                var nd = api.getDisplayedRowAtIndex(r);
-                if (!nd) continue;
-                state.cols.forEach(function(col) {
-                    if (col === '#') return;
-                    nd.setDataValue(col, src.data[col]);
-                });
+            if (fillFrom !== undefined && fillTo >= fillFrom) {
+                execFill(srcRowIdx, fillTo, state.cols);
             }
-            api.refreshCells({ force: true });
         }, 80);
     }, true);
 
@@ -989,10 +1046,7 @@ function(params) {
 
     document.addEventListener('pointerdown', function(e) {
         if (e.pointerType !== 'pen') return;
-        if (e.button === 1 || e.button === 2) {
-            e.preventDefault();
-            openCellEditor();
-        }
+        if (e.button === 1 || e.button === 2) { e.preventDefault(); openCellEditor(); }
     }, true);
 
     document.addEventListener('contextmenu', function(e) {
