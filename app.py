@@ -817,18 +817,18 @@ elif mode == "Загрузить Excel":
                     if col in select_cols_type:
                         gb.configure_column(col, cellEditor='agSelectCellEditor',
                                             cellEditorParams={'values': ["function", "ode_time", "phase_portrait"]},
-                                            width=130)
+                                            minWidth=100)
                     elif col in select_cols_color:
                         gb.configure_column(col, cellEditor='agSelectCellEditor',
-                                            cellEditorParams={'values': color_options_excel}, width=115)
+                                            cellEditorParams={'values': color_options_excel}, minWidth=80)
                     elif col in select_cols_ls:
                         gb.configure_column(col, cellEditor='agSelectCellEditor',
-                                            cellEditorParams={'values': linestyle_options}, width=90)
+                                            cellEditorParams={'values': linestyle_options}, minWidth=60)
                     elif col in numeric_cols:
-                        gb.configure_column(col, type=['numericColumn'], width=90)
+                        gb.configure_column(col, type=['numericColumn'], minWidth=60)
                     elif col in bool_cols:
                         gb.configure_column(col, cellEditor='agCheckboxCellEditor',
-                                            cellRenderer='agCheckboxCellRenderer', width=80)
+                                            cellRenderer='agCheckboxCellRenderer', minWidth=60)
 
                 gb.configure_grid_options(
                     enableRangeSelection=True,
@@ -844,6 +844,16 @@ elif mode == "Загрузить Excel":
 function(params) {
     var api = params.api;
     var lastPointerType = 'touch';
+
+    // === Авто-ширина столбцов по содержимому (как в Excel) ===
+    setTimeout(function() {
+        try {
+            var colApi = params.columnApi || params.api;
+            colApi.autoSizeAllColumns(false);
+        } catch(ex) {
+            try { params.api.autoSizeAllColumns(false); } catch(e2) {}
+        }
+    }, 250);
 
     // === Тип указателя ===
     document.addEventListener('pointerdown', function(e) {
@@ -862,7 +872,7 @@ function(params) {
         }
     }, true);
 
-    // === FILL HANDLE — прямая реализация через AG Grid API (iOS не поддерж. synthetic mouse) ===
+    // === FILL HANDLE — прямая реализация через AG Grid API ===
     var penFill = null;
 
     // Блокируем касание пальцем на fill handle
@@ -873,7 +883,8 @@ function(params) {
         }
     }, true);
 
-    // Стилус на fill handle → записываем исходный диапазон
+    // Стилус на fill handle → запоминаем исходный диапазон
+    // НЕ вызываем setPointerCapture — он ломает elementFromPoint в pointermove
     document.addEventListener('pointerdown', function(e) {
         if (e.pointerType !== 'pen') return;
         var h = e.target.closest && e.target.closest('.ag-fill-handle');
@@ -889,29 +900,68 @@ function(params) {
             cols: rng.columns.map(function(c) { return c.getColId(); }),
             targetRow: r2
         };
-        try { h.setPointerCapture(e.pointerId); } catch(ex){}
     }, true);
 
-    // Отслеживаем строку под стилусом во время перетаскивания
+    // Отслеживаем строку под стилусом двумя методами
     document.addEventListener('pointermove', function(e) {
         if (e.pointerType !== 'pen' || !penFill) return;
+        // Метод 1: elementFromPoint
         var el = document.elementFromPoint(e.clientX, e.clientY);
         var rowEl = el && el.closest && el.closest('.ag-row[row-index]');
-        if (rowEl) penFill.targetRow = parseInt(rowEl.getAttribute('row-index'), 10);
+        if (rowEl) {
+            penFill.targetRow = parseInt(rowEl.getAttribute('row-index'), 10);
+            return;
+        }
+        // Метод 2: bounding rect всех видимых строк
+        var rows = document.querySelectorAll('.ag-row[row-index]');
+        for (var i = 0; i < rows.length; i++) {
+            var rect = rows[i].getBoundingClientRect();
+            if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                var idx = parseInt(rows[i].getAttribute('row-index'), 10);
+                if (!isNaN(idx)) { penFill.targetRow = idx; break; }
+            }
+        }
     }, true);
 
-    // Стилус поднят → заполняем ячейки значением из источника
+    // Стилус поднят → заполняем ячейки
     document.addEventListener('pointerup', function(e) {
         if (e.pointerType !== 'pen' || !penFill) return;
         var state = penFill;
         penFill = null;
         api.stopEditing();
-        var fillTo = state.targetRow;
-        if (fillTo > state.rowEnd) {
-            // Заполняем вниз
-            var src = api.getDisplayedRowAtIndex(state.rowEnd);
+
+        // Задержка: AG Grid Enterprise обновляет диапазон после pointerup
+        setTimeout(function() {
+            var fillFrom, fillTo, srcRowIdx;
+
+            // Приоритет 1: текущий диапазон из AG Grid (Enterprise мог расширить его)
+            var curRanges = api.getCellRanges();
+            if (curRanges && curRanges.length) {
+                var cr = curRanges[0];
+                var cr1 = Math.min(cr.startRow.rowIndex, cr.endRow.rowIndex);
+                var cr2 = Math.max(cr.startRow.rowIndex, cr.endRow.rowIndex);
+                if (cr2 > state.rowEnd) {
+                    srcRowIdx = state.rowEnd; fillFrom = state.rowEnd + 1; fillTo = cr2;
+                } else if (cr1 < state.rowStart) {
+                    srcRowIdx = state.rowStart; fillFrom = cr1; fillTo = state.rowStart - 1;
+                }
+            }
+
+            // Приоритет 2: отслеживаемая targetRow из pointermove
+            if (fillFrom === undefined) {
+                if (state.targetRow > state.rowEnd) {
+                    srcRowIdx = state.rowEnd; fillFrom = state.rowEnd + 1; fillTo = state.targetRow;
+                } else if (state.targetRow < state.rowStart) {
+                    srcRowIdx = state.rowStart; fillFrom = state.targetRow; fillTo = state.rowStart - 1;
+                }
+            }
+
+            if (fillFrom === undefined || fillTo < fillFrom) return;
+
+            var src = api.getDisplayedRowAtIndex(srcRowIdx);
             if (!src) return;
-            for (var r = state.rowEnd + 1; r <= fillTo; r++) {
+
+            for (var r = fillFrom; r <= fillTo; r++) {
                 var nd = api.getDisplayedRowAtIndex(r);
                 if (!nd) continue;
                 state.cols.forEach(function(col) {
@@ -919,20 +969,8 @@ function(params) {
                     nd.setDataValue(col, src.data[col]);
                 });
             }
-        } else if (fillTo < state.rowStart) {
-            // Заполняем вверх
-            var src = api.getDisplayedRowAtIndex(state.rowStart);
-            if (!src) return;
-            for (var r = fillTo; r < state.rowStart; r++) {
-                var nd = api.getDisplayedRowAtIndex(r);
-                if (!nd) continue;
-                state.cols.forEach(function(col) {
-                    if (col === '#') return;
-                    nd.setDataValue(col, src.data[col]);
-                });
-            }
-        }
-        api.refreshCells({ force: true });
+            api.refreshCells({ force: true });
+        }, 80);
     }, true);
 
     // === СЖАТИЕ APPLE PENCIL PRO → открыть редактор ячейки ===
@@ -940,7 +978,6 @@ function(params) {
         var cell = api.getFocusedCell();
         if (!cell) return;
         api.startEditingCell({ rowIndex: cell.rowIndex, colKey: cell.column.colId });
-        // Для select/dropdown ячеек — дополнительно фокусируем нативный элемент
         setTimeout(function() {
             var el = document.querySelector(
                 '.ag-popup-editor select, .ag-popup-editor input, ' +
@@ -950,7 +987,6 @@ function(params) {
         }, 40);
     }
 
-    // button=1 или button=2 (разные версии iOS/Pencil)
     document.addEventListener('pointerdown', function(e) {
         if (e.pointerType !== 'pen') return;
         if (e.button === 1 || e.button === 2) {
@@ -959,7 +995,6 @@ function(params) {
         }
     }, true);
 
-    // contextmenu как альтернатива (некоторые версии iOS)
     document.addEventListener('contextmenu', function(e) {
         if (lastPointerType !== 'pen') return;
         e.preventDefault();
