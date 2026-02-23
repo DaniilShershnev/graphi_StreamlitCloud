@@ -21,5 +21,8 @@ openpyxl>=3.0.0
 # Configuration files
 PyYAML>=5.4.0
 
+# AG Grid table editor (fill handle, row numbers, pen/touch support)
+streamlit-aggrid>=0.3.4
+
 # Optional: For better performance
 # numba>=0.54.0  # Uncomment if you need JIT compilation

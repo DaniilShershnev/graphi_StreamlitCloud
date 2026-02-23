@@ -8,6 +8,12 @@ import base64
 import io
 import json
 
+try:
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+    AGGRID_AVAILABLE = True
+except ImportError:
+    AGGRID_AVAILABLE = False
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Импорт системы постоянного хранения
@@ -336,22 +342,67 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Блокировка автооткрытия клавиатуры на iPad для выпадающих списков
+# Управление клавиатурой и AG Grid fill handle (стилус vs палец)
 st.markdown("""
 <script>
 (function() {
-    function noKeyboard() {
+    var lastPointerType = 'touch';
+
+    // Отслеживаем тип указателя глобально
+    document.addEventListener('pointerdown', function(e) {
+        lastPointerType = e.pointerType || 'touch';
+    }, true);
+
+    // 1. Selectbox/combobox — клавиатура никогда не открывается
+    function noKeyboardOnSelects() {
         var attrs = ['inputmode', 'readonly', 'autocomplete', 'autocorrect', 'autocapitalize', 'spellcheck'];
-        var vals  = ['none',       'true',     'off',          'off',         'none',            'false'];
+        var vals  = ['none',      'true',     'off',          'off',         'none',            'false'];
         document.querySelectorAll(
             '[data-baseweb="select"] input, input[role="combobox"]'
         ).forEach(function(el) {
             attrs.forEach(function(a, i) { el.setAttribute(a, vals[i]); });
         });
     }
-    var obs = new MutationObserver(noKeyboard);
+
+    // 2. AG Grid: клавиатура только для пальца, стилус — без клавиатуры
+    document.addEventListener('focusin', function(e) {
+        var el = e.target;
+        if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+        if (!el.closest('.ag-root-wrapper')) return;
+        if (lastPointerType === 'pen') {
+            el.setAttribute('inputmode', 'none');
+            el.setAttribute('autocomplete', 'off');
+        } else if (lastPointerType === 'touch') {
+            el.removeAttribute('inputmode');
+            el.removeAttribute('readonly');
+        }
+    }, true);
+
+    // 3. AG Grid fill handle — работает только со стилусом, палец игнорируется
+    function setupFillHandlePenOnly() {
+        document.querySelectorAll('.ag-root-wrapper').forEach(function(grid) {
+            if (grid._penFillSet) return;
+            grid._penFillSet = true;
+            grid.addEventListener('pointerdown', function(e) {
+                var handle = e.target.closest
+                    ? e.target.closest('.ag-fill-handle')
+                    : (e.target.classList.contains('ag-fill-handle') ? e.target : null);
+                if (handle && e.pointerType === 'touch') {
+                    e.stopImmediatePropagation();
+                    e.preventDefault();
+                }
+            }, true);
+        });
+    }
+
+    var obs = new MutationObserver(function() {
+        noKeyboardOnSelects();
+        setupFillHandlePenOnly();
+    });
     obs.observe(document.body, {childList: true, subtree: true});
-    noKeyboard();
+
+    noKeyboardOnSelects();
+    setInterval(setupFillHandlePenOnly, 800);
 })();
 </script>
 """, unsafe_allow_html=True)
@@ -512,7 +563,6 @@ with st.sidebar:
             st.rerun()
 
     st.markdown("---")
-    st.caption("Для iPad Pro 11 дюймов")
 
 # ========== МОИ ГРАФИКИ ==========
 if mode == "Мои графики":
@@ -755,72 +805,105 @@ elif mode == "Загрузить Excel":
         if 'edited_df' in st.session_state:
             df = st.session_state.edited_df
 
-            # Интерактивный редактор таблицы с выпадающими меню
+            # Редактор таблицы
             st.markdown("### 📝 Редактор таблицы")
-            st.caption("Вы можете редактировать данные прямо здесь. Выберите значения из выпадающих списков где это возможно.")
+            st.caption("Стилус: выделение + растягивание данных (fill handle) | Палец: редактирование текста")
 
-            # Конфигурация колонок с выпадающими меню
-            column_config = {}
-
-            # Выпадающие меню для типов графиков
-            if 'graph_type' in df.columns or 'type' in df.columns:
-                col_name = 'graph_type' if 'graph_type' in df.columns else 'type'
-                column_config[col_name] = st.column_config.SelectboxColumn(
-                    "Тип графика",
-                    options=["function", "ode_time", "phase_portrait"],
-                    help="Выберите тип графика"
-                )
-
-            # Выпадающие меню для цветов
             color_options_excel = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow", "black", "gray", "brown", "lime", "navy", "maroon", "olive", "teal", "coral", "gold", "darkred", "deepskyblue", "crimson", "darkgreen", "indigo", "violet", "steelblue", "tomato", "darkorange", "lightgreen", "lightskyblue", "slategray"]
-            for col in ['color', 'Color', 'col', 'color_s', 'color_w']:
-                if col in df.columns:
-                    column_config[col] = st.column_config.SelectboxColumn(
-                        f"Цвет ({col})",
-                        options=color_options_excel,
-                        help="Выберите цвет линии"
-                    )
-
-            # Выпадающие меню для стилей линий
             linestyle_options = ["-", "--", ":", "-."]
-            for col in ['linestyle', 'line_style', 'ls', 'linestyle_s', 'linestyle_w', 'isoclines_linestyle_ds', 'isoclines_linestyle_dw']:
-                if col in df.columns:
-                    column_config[col] = st.column_config.SelectboxColumn(
-                        f"Стиль линии ({col})",
-                        options=linestyle_options,
-                        help="Сплошная (-), пунктир (--), точки (:), штрих-пунктир (-.)"
-                    )
-
-            # Числовые колонки
             numeric_cols = ['linewidth', 'linewidth_s', 'linewidth_w', 'x_min', 'x_max', 'xlim_min', 'xlim_max',
                            'ylim_min', 'ylim_max', 't_start', 't_end', 's0', 'w0', 'ic_1', 'ic_2',
                            'a', 'b', 'h', 'alpha', 'betta', 'beta', 'c', 'dpi']
-            for col in numeric_cols:
-                if col in df.columns:
-                    column_config[col] = st.column_config.NumberColumn(
-                        col,
-                        help=f"Числовое значение для {col}",
-                        format="%.4f"
-                    )
-
-            # Boolean колонки
             bool_cols = ['dual_y_axis', 'dual_y', 'two_axes', 'vector_field_enabled', 'isoclines_enabled']
-            for col in bool_cols:
-                if col in df.columns:
-                    column_config[col] = st.column_config.CheckboxColumn(
-                        col,
-                        help=f"Включить/выключить {col}"
-                    )
+            select_cols_color = ['color', 'Color', 'col', 'color_s', 'color_w']
+            select_cols_ls    = ['linestyle', 'line_style', 'ls', 'linestyle_s', 'linestyle_w',
+                                 'isoclines_linestyle_ds', 'isoclines_linestyle_dw']
+            select_cols_type  = ['graph_type', 'type']
 
-            # Редактор данных
-            edited_df = st.data_editor(
-                df,
-                column_config=column_config,
-                num_rows="dynamic",  # Позволяет добавлять и удалять строки
-                use_container_width=True,
-                height=400,
-                key="excel_editor"
-            )
+            if AGGRID_AVAILABLE:
+                # --- AgGrid с fill handle (pen-only) и номерами строк ---
+                df_display = df.copy().reset_index(drop=True)
+                df_display.insert(0, '#', range(1, len(df_display) + 1))
+
+                gb = GridOptionsBuilder.from_dataframe(df_display)
+                gb.configure_column('#', headerName='#', editable=False, sortable=False,
+                                    resizable=False, pinned='left', width=52,
+                                    suppressFillHandle=True, cellStyle={'color': '#9ca3af', 'fontWeight': '600'})
+                gb.configure_default_column(editable=True, resizable=True, sortable=False,
+                                            minWidth=80, suppressFillHandle=False)
+
+                for col in df.columns:
+                    if col in select_cols_type:
+                        gb.configure_column(col, cellEditor='agSelectCellEditor',
+                                            cellEditorParams={'values': ["function", "ode_time", "phase_portrait"]},
+                                            width=130)
+                    elif col in select_cols_color:
+                        gb.configure_column(col, cellEditor='agSelectCellEditor',
+                                            cellEditorParams={'values': color_options_excel}, width=115)
+                    elif col in select_cols_ls:
+                        gb.configure_column(col, cellEditor='agSelectCellEditor',
+                                            cellEditorParams={'values': linestyle_options}, width=90)
+                    elif col in numeric_cols:
+                        gb.configure_column(col, type=['numericColumn'], width=90)
+                    elif col in bool_cols:
+                        gb.configure_column(col, cellEditor='agCheckboxCellEditor',
+                                            cellRenderer='agCheckboxCellRenderer', width=80)
+
+                gb.configure_grid_options(
+                    enableRangeSelection=True,
+                    enableFillHandle=True,
+                    fillHandleDirection='xy',
+                    rowSelection='multiple',
+                    suppressRowClickSelection=True,
+                    animateRows=False,
+                )
+                gridOptions = gb.build()
+
+                grid_response = AgGrid(
+                    df_display,
+                    gridOptions=gridOptions,
+                    update_mode=GridUpdateMode.VALUE_CHANGED,
+                    fit_columns_on_grid_load=False,
+                    height=420,
+                    allow_unsafe_jscode=True,
+                    key="excel_editor_aggrid",
+                    theme='alpine',
+                )
+
+                edited_df = pd.DataFrame(grid_response['data'])
+                if '#' in edited_df.columns:
+                    edited_df = edited_df.drop(columns=['#'])
+                # Восстанавливаем типы данных
+                for col in df.columns:
+                    if col in edited_df.columns:
+                        try:
+                            edited_df[col] = edited_df[col].astype(df[col].dtype)
+                        except Exception:
+                            pass
+            else:
+                # Fallback: стандартный st.data_editor
+                column_config = {}
+                for col_name in select_cols_type:
+                    if col_name in df.columns:
+                        column_config[col_name] = st.column_config.SelectboxColumn(
+                            col_name, options=["function", "ode_time", "phase_portrait"])
+                for col_name in select_cols_color:
+                    if col_name in df.columns:
+                        column_config[col_name] = st.column_config.SelectboxColumn(
+                            col_name, options=color_options_excel)
+                for col_name in select_cols_ls:
+                    if col_name in df.columns:
+                        column_config[col_name] = st.column_config.SelectboxColumn(
+                            col_name, options=linestyle_options)
+                for col_name in numeric_cols:
+                    if col_name in df.columns:
+                        column_config[col_name] = st.column_config.NumberColumn(col_name, format="%.4f")
+                for col_name in bool_cols:
+                    if col_name in df.columns:
+                        column_config[col_name] = st.column_config.CheckboxColumn(col_name)
+                edited_df = st.data_editor(df, column_config=column_config,
+                                           num_rows="dynamic", use_container_width=True,
+                                           height=400, key="excel_editor")
 
             # Обновляем session_state
             st.session_state.edited_df = edited_df
@@ -1850,10 +1933,8 @@ try:
 except:
     version_info = "unknown"
 
-col1, col2, col3 = st.columns([2, 1, 2])
+col1, col2 = st.columns([2, 1])
 with col1:
     st.caption(f"📊 Графиков построено: {len(st.session_state.graph_history)}")
 with col2:
     st.caption(f"🔄 {version_info}")
-with col3:
-    st.caption("Для iPad Pro 11\"")
