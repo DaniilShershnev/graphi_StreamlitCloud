@@ -49,10 +49,21 @@ st.markdown("""
     [data-testid="stSidebar"] {
         background: #ffffff;
         border-right: 1px solid #e5e7eb;
+        overflow: hidden !important;
+    }
+
+    [data-testid="stSidebar"] > div:first-child {
+        overflow-y: hidden !important;
+        overflow-x: hidden !important;
+    }
+
+    section[data-testid="stSidebar"] > div {
+        overflow-y: hidden !important;
     }
 
     [data-testid="stSidebar"] .block-container {
         padding: 2rem 1.5rem !important;
+        overflow: hidden !important;
     }
 
     /* Карточки */
@@ -1249,7 +1260,7 @@ else:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("График функции")
 
-        col1, col2 = st.columns([3, 1])
+        col1, col2 = st.columns([2, 1])
 
         with col1:
             # Галерея готовых формул
@@ -1288,6 +1299,22 @@ else:
             with col_b:
                 x_max = st.number_input("x max", value=10.0, step=1.0)
 
+            col_x, col_y, col_f = st.columns(3)
+            with col_x:
+                xlabel_choice = st.selectbox("Ось X", AXIS_LABELS["x"] + ["Своя метка"], index=0)
+                if xlabel_choice == "Своя метка":
+                    xlabel = st.text_input("Метка X", value="x", label_visibility="collapsed")
+                else:
+                    xlabel = xlabel_choice
+            with col_y:
+                ylabel_choice = st.selectbox("Ось Y", AXIS_LABELS["y"] + ["Своя метка"], index=1)
+                if ylabel_choice == "Своя метка":
+                    ylabel = st.text_input("Метка Y", value="y", label_visibility="collapsed")
+                else:
+                    ylabel = ylabel_choice
+            with col_f:
+                filename = st.text_input("Имя файла", value="function")
+
         with col2:
             st.markdown("**Стиль**")
             color_name = st.selectbox("Цвет", list(COLOR_OPTIONS.keys()), index=1)  # Синий по умолчанию
@@ -1299,24 +1326,11 @@ else:
                                          key="linestyle_func")
 
             st.markdown("**Оси графика**")
-            show_top_spine = st.checkbox("Верхняя ось", value=False, key="show_top_func")
-            show_right_spine = st.checkbox("Правая ось", value=False, key="show_right_func")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            xlabel_choice = st.selectbox("Ось X", AXIS_LABELS["x"] + ["Своя метка"], index=0)
-            if xlabel_choice == "Своя метка":
-                xlabel = st.text_input("Введите метку X", value="x", label_visibility="collapsed")
-            else:
-                xlabel = xlabel_choice
-        with col2:
-            ylabel_choice = st.selectbox("Ось Y", AXIS_LABELS["y"] + ["Своя метка"], index=1)
-            if ylabel_choice == "Своя метка":
-                ylabel = st.text_input("Введите метку Y", value="y", label_visibility="collapsed")
-            else:
-                ylabel = ylabel_choice
-        with col3:
-            filename = st.text_input("Имя файла", value="function")
+            col_sp1, col_sp2 = st.columns(2)
+            with col_sp1:
+                show_top_spine = st.checkbox("Верхняя", value=False, key="show_top_func")
+            with col_sp2:
+                show_right_spine = st.checkbox("Правая", value=False, key="show_right_func")
 
         if st.button("Построить", type="primary", width="stretch"):
             try:
@@ -1372,10 +1386,39 @@ else:
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
+                st.session_state.last_built_tab = "function"
+                st.session_state.pop('save_name_func_inline', None)
                 st.success("График успешно построен")
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
+
+        # Inline preview + сохранение в библиотеку
+        if st.session_state.current_graph is not None and st.session_state.get('last_built_tab') == 'function':
+            st.markdown("---")
+            svg_b64 = base64.b64encode(st.session_state.current_graph).decode()
+            st.markdown(
+                f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">',
+                unsafe_allow_html=True
+            )
+            g_name_f = st.session_state.graph_history[-1]['name'] if st.session_state.graph_history else "graph"
+            ci1, ci2, ci3 = st.columns([3, 1, 1])
+            with ci1:
+                new_name_f = st.text_input("Имя в библиотеке", value=g_name_f, key="save_name_func_inline")
+            with ci2:
+                if st.button("💾 Сохранить", key="save_lib_func_inline", use_container_width=True, type="primary"):
+                    if st.session_state.graph_history and new_name_f.strip():
+                        last = st.session_state.graph_history[-1]
+                        storage.delete_graph(last['name'], last['timestamp'])
+                        new_ts = datetime.now().strftime('%H:%M:%S')
+                        storage.save_graph(new_name_f.strip(), new_ts, last['type'], last['svg_data'])
+                        st.session_state.graph_history[-1]['name'] = new_name_f.strip()
+                        st.session_state.graph_history[-1]['timestamp'] = new_ts
+                        st.success(f"✅ Сохранено: «{new_name_f.strip()}»")
+            with ci3:
+                st.download_button("⬇️ SVG", st.session_state.current_graph,
+                                   file_name=f"{g_name_f}.svg", mime="image/svg+xml",
+                                   use_container_width=True, key="dl_func_inline")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1529,10 +1572,39 @@ else:
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
+                st.session_state.last_built_tab = "ode"
+                st.session_state.pop('save_name_ode_inline', None)
                 st.success("ОДУ успешно решена")
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
+
+        # Inline preview + сохранение в библиотеку
+        if st.session_state.current_graph is not None and st.session_state.get('last_built_tab') == 'ode':
+            st.markdown("---")
+            svg_b64 = base64.b64encode(st.session_state.current_graph).decode()
+            st.markdown(
+                f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">',
+                unsafe_allow_html=True
+            )
+            g_name_ode = st.session_state.graph_history[-1]['name'] if st.session_state.graph_history else "ode"
+            ci1, ci2, ci3 = st.columns([3, 1, 1])
+            with ci1:
+                new_name_ode = st.text_input("Имя в библиотеке", value=g_name_ode, key="save_name_ode_inline")
+            with ci2:
+                if st.button("💾 Сохранить", key="save_lib_ode_inline", use_container_width=True, type="primary"):
+                    if st.session_state.graph_history and new_name_ode.strip():
+                        last = st.session_state.graph_history[-1]
+                        storage.delete_graph(last['name'], last['timestamp'])
+                        new_ts = datetime.now().strftime('%H:%M:%S')
+                        storage.save_graph(new_name_ode.strip(), new_ts, last['type'], last['svg_data'])
+                        st.session_state.graph_history[-1]['name'] = new_name_ode.strip()
+                        st.session_state.graph_history[-1]['timestamp'] = new_ts
+                        st.success(f"✅ Сохранено: «{new_name_ode.strip()}»")
+            with ci3:
+                st.download_button("⬇️ SVG", st.session_state.current_graph,
+                                   file_name=f"{g_name_ode}.svg", mime="image/svg+xml",
+                                   use_container_width=True, key="dl_ode_inline")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1648,10 +1720,39 @@ else:
                         st.session_state.current_graph = svg_data
                         os.unlink(tmp.name)
 
+                st.session_state.last_built_tab = "phase"
+                st.session_state.pop('save_name_pp_inline', None)
                 st.success("Фазовый портрет успешно построен")
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
+
+        # Inline preview + сохранение в библиотеку
+        if st.session_state.current_graph is not None and st.session_state.get('last_built_tab') == 'phase':
+            st.markdown("---")
+            svg_b64 = base64.b64encode(st.session_state.current_graph).decode()
+            st.markdown(
+                f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">',
+                unsafe_allow_html=True
+            )
+            g_name_pp = st.session_state.graph_history[-1]['name'] if st.session_state.graph_history else "phase"
+            ci1, ci2, ci3 = st.columns([3, 1, 1])
+            with ci1:
+                new_name_pp = st.text_input("Имя в библиотеке", value=g_name_pp, key="save_name_pp_inline")
+            with ci2:
+                if st.button("💾 Сохранить", key="save_lib_pp_inline", use_container_width=True, type="primary"):
+                    if st.session_state.graph_history and new_name_pp.strip():
+                        last = st.session_state.graph_history[-1]
+                        storage.delete_graph(last['name'], last['timestamp'])
+                        new_ts = datetime.now().strftime('%H:%M:%S')
+                        storage.save_graph(new_name_pp.strip(), new_ts, last['type'], last['svg_data'])
+                        st.session_state.graph_history[-1]['name'] = new_name_pp.strip()
+                        st.session_state.graph_history[-1]['timestamp'] = new_ts
+                        st.success(f"✅ Сохранено: «{new_name_pp.strip()}»")
+            with ci3:
+                st.download_button("⬇️ SVG", st.session_state.current_graph,
+                                   file_name=f"{g_name_pp}.svg", mime="image/svg+xml",
+                                   use_container_width=True, key="dl_pp_inline")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
