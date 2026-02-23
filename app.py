@@ -308,7 +308,41 @@ st.markdown("""
     input[type=number]::-webkit-outer-spin-button {
         opacity: 1;
     }
+
+    /* Выравнивание колонок по верхнему краю */
+    [data-testid="stHorizontalBlock"] {
+        align-items: flex-start !important;
+    }
+
+    [data-testid="column"] {
+        padding-top: 0 !important;
+    }
+
+    /* Убрать лишние отступы между элементами форм */
+    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] {
+        gap: 0.5rem;
+    }
 </style>
+""", unsafe_allow_html=True)
+
+# Блокировка автооткрытия клавиатуры на iPad для выпадающих списков
+st.markdown("""
+<script>
+(function() {
+    function noKeyboard() {
+        var attrs = ['inputmode', 'readonly', 'autocomplete', 'autocorrect', 'autocapitalize', 'spellcheck'];
+        var vals  = ['none',       'true',     'off',          'off',         'none',            'false'];
+        document.querySelectorAll(
+            '[data-baseweb="select"] input, input[role="combobox"]'
+        ).forEach(function(el) {
+            attrs.forEach(function(a, i) { el.setAttribute(a, vals[i]); });
+        });
+    }
+    var obs = new MutationObserver(noKeyboard);
+    obs.observe(document.body, {childList: true, subtree: true});
+    noKeyboard();
+})();
+</script>
 """, unsafe_allow_html=True)
 
 # fix_latex() REMOVED - parse_latex() from sympy handles LaTeX natively
@@ -330,7 +364,22 @@ COLOR_OPTIONS = {
     "Лайм": "lime",
     "Темно-синий": "navy",
     "Бордовый": "maroon",
-    "Оливковый": "olive"
+    "Оливковый": "olive",
+    "Бирюзовый": "teal",
+    "Коралловый": "coral",
+    "Золотой": "gold",
+    "Темно-красный": "darkred",
+    "Лазурный": "deepskyblue",
+    "Малиновый": "crimson",
+    "Темно-зеленый": "darkgreen",
+    "Индиго": "indigo",
+    "Лиловый": "violet",
+    "Стальной": "steelblue",
+    "Томатный": "tomato",
+    "Темно-оранжевый": "darkorange",
+    "Светло-зеленый": "lightgreen",
+    "Светло-синий": "lightskyblue",
+    "Серо-синий": "slategray",
 }
 
 # Галерея готовых формул для iPad
@@ -712,7 +761,7 @@ elif mode == "Загрузить Excel":
                 )
 
             # Выпадающие меню для цветов
-            color_options_excel = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow", "black", "gray"]
+            color_options_excel = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow", "black", "gray", "brown", "lime", "navy", "maroon", "olive", "teal", "coral", "gold", "darkred", "deepskyblue", "crimson", "darkgreen", "indigo", "violet", "steelblue", "tomato", "darkorange", "lightgreen", "lightskyblue", "slategray"]
             for col in ['color', 'Color', 'col', 'color_s', 'color_w']:
                 if col in df.columns:
                     column_config[col] = st.column_config.SelectboxColumn(
