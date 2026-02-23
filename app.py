@@ -903,17 +903,31 @@ function(params) {
 """)
                 # CSS применяется внутри iframe через custom_css
                 ag_custom_css = {
+                    # Уголок fill handle — крупный, синий, не обрезается
                     ".ag-fill-handle": {
-                        "width": "16px !important",
-                        "height": "16px !important",
-                        "bottom": "-8px !important",
-                        "right": "-8px !important",
+                        "width": "20px !important",
+                        "height": "20px !important",
+                        "bottom": "-10px !important",
+                        "right": "-10px !important",
                         "border-radius": "4px !important",
+                        "background-color": "#1976d2 !important",
+                        "border": "2px solid white !important",
                         "cursor": "crosshair !important",
                         "touch-action": "none !important",
-                        "z-index": "100 !important",
+                        "z-index": "9999 !important",
                         "display": "block !important",
-                    }
+                        "position": "absolute !important",
+                    },
+                    # Ячейки не должны обрезать уголок, торчащий за границу
+                    ".ag-cell": {
+                        "overflow": "visible !important",
+                    },
+                    ".ag-row": {
+                        "overflow": "visible !important",
+                    },
+                    ".ag-center-cols-container": {
+                        "overflow": "visible !important",
+                    },
                 }
 
                 grid_response = AgGrid(
@@ -923,6 +937,7 @@ function(params) {
                     fit_columns_on_grid_load=False,
                     height=420,
                     allow_unsafe_jscode=True,
+                    enable_enterprise_modules=True,
                     key="excel_editor_aggrid",
                     theme='alpine',
                     custom_css=ag_custom_css,
