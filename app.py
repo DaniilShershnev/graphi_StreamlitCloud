@@ -716,15 +716,23 @@ elif mode == "Загрузить Excel":
             section[data-testid="stSidebar"] { display: none !important; }
             header[data-testid="stHeader"]   { display: none !important; }
             footer                           { display: none !important; }
-            body, .stApp                     { background: #1c1c2e !important; }
-            .main                            { background: transparent !important; padding: 0.5vh 0.5vw !important; }
+            body, .stApp, .main             { background: white !important; }
+            .main {
+                padding: 0 !important;
+                margin:  0 !important;
+            }
             .main .block-container {
                 background:    white !important;
-                border-radius: 16px !important;
-                padding:       0.5rem 0.75rem 0.75rem !important;
+                border-radius: 0 !important;
+                padding:       4px 6px 0 6px !important;
                 max-width:     100% !important;
-                min-height:    98vh !important;
-                box-shadow:    0 8px 40px rgba(0,0,0,0.55) !important;
+                min-height:    100vh !important;
+                box-shadow:    none !important;
+            }
+            /* Растягиваем iframe таблицы на весь оставшийся экран */
+            iframe[title="st_aggrid.agGrid"] {
+                height: calc(100vh - 56px) !important;
+                min-height: calc(100vh - 56px) !important;
             }
         </style>""", unsafe_allow_html=True)
         uploaded_file = None
@@ -817,7 +825,7 @@ elif mode == "Загрузить Excel":
                                  'isoclines_linestyle_ds', 'isoclines_linestyle_dw']
             select_cols_type  = ['graph_type', 'type']
 
-            _tbl_height = 700 if st.session_state.get('table_modal', False) else 420
+            _tbl_height = 1200 if st.session_state.get('table_modal', False) else 420
 
             if AGGRID_AVAILABLE:
                 # --- AgGrid с fill handle (pen-only) и номерами строк ---
