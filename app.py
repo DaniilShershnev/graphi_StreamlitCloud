@@ -708,31 +708,52 @@ elif mode == "Библиотека":
 
 # ========== EXCEL ==========
 elif mode == "Загрузить Excel":
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("Загрузка Excel файла")
+    _modal_active = st.session_state.get('table_modal', False)
 
-    # Быстрая загрузка из библиотеки (перемещаем наверх)
-    if st.session_state.saved_excel_configs:
-        with st.expander("📚 Быстрая загрузка из библиотеки", expanded=False):
-            saved_config_name = st.selectbox(
-                "Выберите сохраненную конфигурацию",
-                ["Не выбрано"] + list(st.session_state.saved_excel_configs.keys()),
-                key="load_saved_config_top"
-            )
-            if saved_config_name != "Не выбрано":
-                if st.button(f"📂 Загрузить '{saved_config_name}'", use_container_width=True):
-                    st.session_state.edited_df = st.session_state.saved_excel_configs[saved_config_name].copy()
-                    st.session_state.current_config_name = saved_config_name
-                    st.success(f"✅ Загружена конфигурация '{saved_config_name}'")
-                    st.rerun()
+    if _modal_active:
+        # В модальном режиме — сразу CSS, остальное не рендерим
+        st.markdown("""<style>
+            section[data-testid="stSidebar"] { display: none !important; }
+            header[data-testid="stHeader"]   { display: none !important; }
+            footer                           { display: none !important; }
+            body, .stApp                     { background: #1c1c2e !important; }
+            .main                            { background: transparent !important; padding: 0.5vh 0.5vw !important; }
+            .main .block-container {
+                background:    white !important;
+                border-radius: 16px !important;
+                padding:       0.5rem 0.75rem 0.75rem !important;
+                max-width:     100% !important;
+                min-height:    98vh !important;
+                box-shadow:    0 8px 40px rgba(0,0,0,0.55) !important;
+            }
+        </style>""", unsafe_allow_html=True)
+        uploaded_file = None
+    else:
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        st.subheader("Загрузка Excel файла")
 
-    st.info("Загрузите таблицу с конфигурациями графиков (.xlsx или .xls)")
+        # Быстрая загрузка из библиотеки (перемещаем наверх)
+        if st.session_state.saved_excel_configs:
+            with st.expander("📚 Быстрая загрузка из библиотеки", expanded=False):
+                saved_config_name = st.selectbox(
+                    "Выберите сохраненную конфигурацию",
+                    ["Не выбрано"] + list(st.session_state.saved_excel_configs.keys()),
+                    key="load_saved_config_top"
+                )
+                if saved_config_name != "Не выбрано":
+                    if st.button(f"📂 Загрузить '{saved_config_name}'", use_container_width=True):
+                        st.session_state.edited_df = st.session_state.saved_excel_configs[saved_config_name].copy()
+                        st.session_state.current_config_name = saved_config_name
+                        st.success(f"✅ Загружена конфигурация '{saved_config_name}'")
+                        st.rerun()
 
-    uploaded_file = st.file_uploader(
-        "Выберите файл",
-        type=['xlsx', 'xls'],
-        label_visibility="collapsed"
-    )
+        st.info("Загрузите таблицу с конфигурациями графиков (.xlsx или .xls)")
+
+        uploaded_file = st.file_uploader(
+            "Выберите файл",
+            type=['xlsx', 'xls'],
+            label_visibility="collapsed"
+        )
 
     # Проверяем есть ли данные для редактирования (из файла или из библиотеки)
     has_data = uploaded_file is not None or 'edited_df' in st.session_state
@@ -768,26 +789,7 @@ elif mode == "Загрузить Excel":
                 st.session_state.table_modal = False
 
             if st.session_state.table_modal:
-                # === Модальное окно: тёмный фон + белая карточка поверх ===
-                st.markdown("""<style>
-                    section[data-testid="stSidebar"] { display: none !important; }
-                    header[data-testid="stHeader"]   { display: none !important; }
-                    footer                           { display: none !important; }
-                    body, .stApp                     { background: #1c1c2e !important; }
-                    .main                            { background: transparent !important; padding: 0.5vh 0.5vw !important; }
-                    .main .block-container {
-                        background:    white !important;
-                        border-radius: 16px !important;
-                        padding:       0.5rem 0.75rem 0.75rem !important;
-                        max-width:     100% !important;
-                        min-height:    98vh !important;
-                        box-shadow:    0 8px 40px rgba(0,0,0,0.55) !important;
-                    }
-                    /* Кнопка закрытия — маленькая, справа сверху */
-                    div[data-testid="stHorizontalBlock"]:has(#btn_close_modal) {
-                        position: absolute; top: 8px; right: 8px; z-index: 1000;
-                    }
-                </style>""", unsafe_allow_html=True)
+                # CSS уже вставлен выше; показываем только кнопку ✕
                 _, _close_col = st.columns([20, 1])
                 with _close_col:
                     if st.button("✕", use_container_width=True, key="btn_close_modal"):
