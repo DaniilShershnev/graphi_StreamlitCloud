@@ -344,9 +344,22 @@ st.markdown("""
 
 # Управление клавиатурой и AG Grid fill handle (стилус vs палец)
 st.markdown("""
+<style>
+    /* Fill handle крупнее — удобно попасть стилусом */
+    .ag-fill-handle {
+        width: 14px !important;
+        height: 14px !important;
+        bottom: -7px !important;
+        right: -7px !important;
+        border-radius: 3px !important;
+        cursor: crosshair !important;
+        touch-action: none !important;
+    }
+</style>
 <script>
 (function() {
     var lastPointerType = 'touch';
+    var penDragActive   = false;
 
     // Отслеживаем тип указателя глобально
     document.addEventListener('pointerdown', function(e) {
@@ -364,7 +377,7 @@ st.markdown("""
         });
     }
 
-    // 2. AG Grid: клавиатура только для пальца, стилус — без клавиатуры
+    // 2. AG Grid ячейки: стилус — без клавиатуры, палец — с клавиатурой
     document.addEventListener('focusin', function(e) {
         var el = e.target;
         if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
@@ -378,15 +391,50 @@ st.markdown("""
         }
     }, true);
 
-    // 3. AG Grid fill handle — работает только со стилусом, палец игнорируется
+    // 3. Fill handle: мост pen pointer → mouse events
+    //    AG Grid использует mouse events внутри — pointer events от стилуса нужно конвертировать
+    document.addEventListener('pointerdown', function(e) {
+        if (e.pointerType !== 'pen') return;
+        var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
+        if (!handle) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        penDragActive = true;
+
+        handle.dispatchEvent(new MouseEvent('mousedown', {
+            bubbles: true, cancelable: true,
+            clientX: e.clientX, clientY: e.clientY,
+            button: 0, buttons: 1
+        }));
+    }, true);
+
+    document.addEventListener('pointermove', function(e) {
+        if (e.pointerType !== 'pen' || !penDragActive) return;
+        document.dispatchEvent(new MouseEvent('mousemove', {
+            bubbles: true, cancelable: true,
+            clientX: e.clientX, clientY: e.clientY,
+            button: 0, buttons: 1
+        }));
+    }, true);
+
+    document.addEventListener('pointerup', function(e) {
+        if (e.pointerType !== 'pen' || !penDragActive) return;
+        penDragActive = false;
+        document.dispatchEvent(new MouseEvent('mouseup', {
+            bubbles: true, cancelable: true,
+            clientX: e.clientX, clientY: e.clientY,
+            button: 0
+        }));
+    }, true);
+
+    // 4. Fill handle: блокируем drag пальцем (только стилус)
     function setupFillHandlePenOnly() {
         document.querySelectorAll('.ag-root-wrapper').forEach(function(grid) {
             if (grid._penFillSet) return;
             grid._penFillSet = true;
             grid.addEventListener('pointerdown', function(e) {
-                var handle = e.target.closest
-                    ? e.target.closest('.ag-fill-handle')
-                    : (e.target.classList.contains('ag-fill-handle') ? e.target : null);
+                var handle = e.target.closest ? e.target.closest('.ag-fill-handle') : null;
                 if (handle && e.pointerType === 'touch') {
                     e.stopImmediatePropagation();
                     e.preventDefault();
@@ -394,6 +442,20 @@ st.markdown("""
             }, true);
         });
     }
+
+    // 5. Сжатие стилуса (barrel button, button=1) → открыть редактор выбранной ячейки
+    document.addEventListener('pointerdown', function(e) {
+        if (e.pointerType !== 'pen' || e.button !== 1) return;
+        var api = window._agGridApi;
+        if (!api) return;
+        var cell = api.getFocusedCell();
+        if (cell) {
+            api.startEditingCell({
+                rowIndex: cell.rowIndex,
+                colKey: cell.column.colId
+            });
+        }
+    }, true);
 
     var obs = new MutationObserver(function() {
         noKeyboardOnSelects();
@@ -858,6 +920,13 @@ elif mode == "Загрузить Excel":
                     animateRows=False,
                 )
                 gridOptions = gb.build()
+
+                # Сохраняем AG Grid API в window для доступа из JS (squeeze, fill handle)
+                gridOptions['onGridReady'] = JsCode("""
+function(params) {
+    window._agGridApi = params.api;
+}
+""")
 
                 grid_response = AgGrid(
                     df_display,
