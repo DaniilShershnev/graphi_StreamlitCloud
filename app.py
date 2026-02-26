@@ -170,11 +170,16 @@ st.markdown("""
     .stDataFrame { border: 1px solid #e5e7eb; border-radius: 7px; }
 
     /* Кнопка открытия боковой панели — прижата к левому краю */
-    button[data-testid="collapsedControl"] {
+    [data-testid="collapsedControl"] {
         position: fixed !important;
         left: 0 !important;
-        top: 0.5rem !important;
-        z-index: 999 !important;
+        top: 0 !important;
+        margin: 0 !important;
+        z-index: 9999 !important;
+    }
+    /* На случай если обёртка сдвигает кнопку */
+    [data-testid="collapsedControl"] > * {
+        margin: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
