@@ -168,6 +168,14 @@ st.markdown("""
 
     /* Dataframe */
     .stDataFrame { border: 1px solid #e5e7eb; border-radius: 7px; }
+
+    /* Кнопка открытия боковой панели — прижата к левому краю */
+    button[data-testid="collapsedControl"] {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0.5rem !important;
+        z-index: 999 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -2011,8 +2019,4 @@ try:
 except:
     version_info = "unknown"
 
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.caption(f"📊 Графиков построено: {len(st.session_state.graph_history)}")
-with col2:
-    st.caption(f"🔄 {version_info}")
+st.caption(f"🔄 {version_info}")
