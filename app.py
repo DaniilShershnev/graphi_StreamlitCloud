@@ -31,314 +31,143 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Профессиональный CSS
+# CSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-    * {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
-    /* Основной фон */
-    .main {
-        background: #f5f7fa;
-        padding: 0;
-    }
+    /* Основной фон — белый */
+    .main, .stApp { background: #ffffff !important; }
+    .block-container { padding: 1.25rem 2rem !important; max-width: 1600px; }
 
-    .block-container {
-        padding: 2rem 3rem !important;
-        max-width: 1600px;
-    }
-
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: #ffffff;
-        border-right: 1px solid #e5e7eb;
+    /* ========== SIDEBAR — компактное меню ========== */
+    section[data-testid="stSidebar"] {
+        background: #f8fafc !important;
+        border-right: 1px solid #e2e8f0 !important;
+        min-width: 190px !important;
+        max-width: 190px !important;
         overflow: hidden !important;
     }
-
-    [data-testid="stSidebar"] > div:first-child {
-        overflow-y: hidden !important;
-        overflow-x: hidden !important;
-    }
-
-    section[data-testid="stSidebar"] > div {
-        overflow-y: hidden !important;
-    }
-
+    section[data-testid="stSidebar"] > div { overflow: hidden !important; }
     [data-testid="stSidebar"] .block-container {
-        padding: 2rem 1.5rem !important;
+        padding: 1.5rem 0 1rem 0 !important;
         overflow: hidden !important;
     }
 
-    /* Карточки */
-    .card {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 2.5rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    /* Убираем кружки у radio и делаем nav-стиль */
+    .stRadio > label { display: none !important; }
+    .stRadio > div { gap: 0 !important; flex-direction: column !important; }
+    .stRadio > div > label {
+        background: transparent !important;
+        border: none !important;
+        border-left: 3px solid transparent !important;
+        border-radius: 0 !important;
+        padding: 0.65rem 1.1rem !important;
+        color: #64748b !important;
+        font-weight: 400 !important;
+        font-size: 0.9rem !important;
+        cursor: pointer;
+        transition: all 0.15s;
+        width: 100%;
     }
-
-    /* Заголовки */
-    h1 {
-        color: #111827 !important;
-        font-weight: 700 !important;
-        font-size: 2.25rem !important;
-        margin-bottom: 0.75rem !important;
-        letter-spacing: -0.025em !important;
+    .stRadio > div > label:hover {
+        background: #f1f5f9 !important;
+        color: #334155 !important;
+        border-left-color: #cbd5e1 !important;
     }
-
-    h2 {
-        color: #374151 !important;
+    .stRadio > div > label[data-checked="true"] {
+        background: #eff6ff !important;
+        color: #2563eb !important;
+        border-left-color: #2563eb !important;
         font-weight: 600 !important;
-        font-size: 1.5rem !important;
-        margin-bottom: 1.5rem !important;
-        letter-spacing: -0.02em !important;
     }
+    /* Скрыть radio-кружок */
+    .stRadio > div > label > div:first-child { display: none !important; }
 
-    h3 {
-        color: #4b5563 !important;
-        font-weight: 600 !important;
-        font-size: 1.125rem !important;
-        margin-bottom: 1rem !important;
-    }
+    /* Скрыть .card артефакты (это inline-div без реального содержимого) */
+    .card { display: none !important; }
+    .gallery-card { display: none !important; }
 
-    /* Кнопки */
-    .stButton>button {
+    /* ========== Кнопки ========== */
+    .stButton > button {
         background: #2563eb;
         color: white;
         border: none;
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
-        font-size: 0.95rem;
+        border-radius: 7px;
+        padding: 0.6rem 1.2rem;
+        font-size: 0.9rem;
         font-weight: 500;
         width: 100%;
-        height: auto;
-        min-height: 3rem;
-        transition: all 0.2s;
-        letter-spacing: 0.01em;
+        min-height: 2.6rem;
+        transition: background 0.2s;
     }
+    .stButton > button:hover { background: #1d4ed8; }
+    .stButton > button[kind="primary"] { background: #10b981; font-weight: 600; }
+    .stButton > button[kind="primary"]:hover { background: #059669; }
 
-    .stButton>button:hover {
-        background: #1d4ed8;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    /* Download button */
+    .stDownloadButton > button {
+        background: #10b981; color: white; border-radius: 7px;
+        font-weight: 500; min-height: 2.6rem;
     }
+    .stDownloadButton > button:hover { background: #059669; }
 
-    .stButton>button[kind="primary"] {
-        background: #10b981;
-        font-weight: 600;
-    }
-
-    .stButton>button[kind="primary"]:hover {
-        background: #059669;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-    }
-
-    /* Поля ввода */
-    .stTextInput>div>div>input,
-    .stNumberInput>div>div>input,
+    /* ========== Поля ввода ========== */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input,
     .stTextArea textarea {
-        border-radius: 8px;
+        border-radius: 7px;
         border: 1px solid #d1d5db;
-        padding: 0.75rem;
-        font-size: 0.95rem;
+        padding: 0.6rem 0.75rem;
+        font-size: 0.9rem;
         background: white;
-        transition: all 0.2s;
     }
-
-    .stTextInput>div>div>input:focus,
-    .stNumberInput>div>div>input:focus,
-    .stTextArea textarea:focus {
+    .stTextInput > div > div > input:focus,
+    .stNumberInput > div > div > input:focus {
         border-color: #2563eb;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        box-shadow: 0 0 0 2px rgba(37,99,235,0.12);
     }
-
-    /* Labels */
-    .stTextInput label,
-    .stNumberInput label,
-    .stSelectbox label,
-    .stTextArea label {
-        color: #374151 !important;
-        font-weight: 500 !important;
-        font-size: 0.875rem !important;
-        margin-bottom: 0.5rem !important;
-    }
-
-    /* Selectbox */
-    .stSelectbox>div>div {
-        border-radius: 8px;
+    .stSelectbox > div > div {
+        border-radius: 7px;
         border: 1px solid #d1d5db;
         background: white;
     }
 
-    /* Slider */
-    .stSlider {
-        padding: 0.5rem 0;
-    }
-
-    /* Radio buttons */
-    .stRadio>div {
-        gap: 0.75rem;
-    }
-
-    .stRadio>div>label {
-        background: #f9fafb;
-        padding: 0.75rem 1rem;
-        border-radius: 8px;
-        border: 1px solid #e5e7eb;
-        transition: all 0.2s;
-        cursor: pointer;
-        font-weight: 500;
-        color: #374151;
-    }
-
-    .stRadio>div>label:hover {
-        background: #f3f4f6;
-        border-color: #d1d5db;
-    }
-
-    .stRadio>div>label[data-checked="true"] {
-        background: #eff6ff;
-        border-color: #2563eb;
-        color: #2563eb;
-    }
-
-    /* Tabs */
+    /* ========== Tabs ========== */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0.5rem;
+        gap: 0.25rem;
         border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 1rem;
     }
-
     .stTabs [data-baseweb="tab"] {
-        border-radius: 8px 8px 0 0;
-        padding: 0.75rem 1.5rem;
+        padding: 0.6rem 1.25rem;
         font-weight: 500;
+        font-size: 0.9rem;
         color: #6b7280;
+        border-radius: 6px 6px 0 0;
         border-bottom: 2px solid transparent;
     }
-
-    .stTabs [data-baseweb="tab"]:hover {
-        color: #374151;
-        background: #f9fafb;
-    }
-
+    .stTabs [data-baseweb="tab"]:hover { color: #374151; background: #f9fafb; }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         color: #2563eb;
         border-bottom-color: #2563eb;
         background: transparent;
     }
 
-    /* Download button */
-    .stDownloadButton>button {
-        background: #10b981;
-        color: white;
-        border-radius: 8px;
-        font-weight: 500;
-        padding: 0.75rem 1.5rem;
-    }
+    /* Выравнивание колонок по верху */
+    [data-testid="stHorizontalBlock"] { align-items: flex-start !important; }
+    [data-testid="column"] { padding-top: 0 !important; }
 
-    .stDownloadButton>button:hover {
-        background: #059669;
-    }
+    /* Убрать лишние вертикальные отступы */
+    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] { gap: 0.4rem; }
 
-    /* Success/Error messages */
-    .stSuccess {
-        background: #ecfdf5;
-        border: 1px solid #10b981;
-        border-radius: 8px;
-        padding: 1rem;
-        color: #065f46;
-    }
-
-    .stError {
-        background: #fef2f2;
-        border: 1px solid #ef4444;
-        border-radius: 8px;
-        padding: 1rem;
-        color: #991b1b;
-    }
-
-    .stInfo {
-        background: #eff6ff;
-        border: 1px solid #3b82f6;
-        border-radius: 8px;
-        padding: 1rem;
-        color: #1e40af;
-    }
-
-    /* Галерея */
-    .gallery-card {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 1.25rem;
-        transition: all 0.2s;
-        cursor: pointer;
-        margin-bottom: 1.5rem;
-    }
-
-    .gallery-card:hover {
-        border-color: #2563eb;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-        transform: translateY(-2px);
-    }
-
-    /* Предпросмотр графика */
-    .graph-preview {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 2rem;
-        margin: 2rem 0;
-    }
-
-    /* Expander */
-    .streamlit-expanderHeader {
-        background: #f9fafb;
-        border-radius: 8px;
-        font-weight: 500;
-        color: #374151;
-    }
-
-    /* Progress bar */
-    .stProgress>div>div {
-        background: #2563eb;
-    }
+    /* Прогресс */
+    .stProgress > div > div { background: #2563eb; }
 
     /* Dataframe */
-    .stDataFrame {
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-    }
-
-    /* Caption */
-    .caption {
-        color: #6b7280;
-        font-size: 0.875rem;
-    }
-
-    /* Удалить стрелки у number input */
-    input[type=number]::-webkit-inner-spin-button,
-    input[type=number]::-webkit-outer-spin-button {
-        opacity: 1;
-    }
-
-    /* Выравнивание колонок по верхнему краю */
-    [data-testid="stHorizontalBlock"] {
-        align-items: flex-start !important;
-    }
-
-    [data-testid="column"] {
-        padding-top: 0 !important;
-    }
-
-    /* Убрать лишние отступы между элементами форм */
-    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] {
-        gap: 0.5rem;
-    }
+    .stDataFrame { border: 1px solid #e5e7eb; border-radius: 7px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -496,31 +325,22 @@ if 'current_graph' not in st.session_state:
 if 'saved_manual_configs' not in st.session_state:
     st.session_state.saved_manual_configs = {}  # {name: config_dict}
 
-# Header
-st.title("Graph Builder")
-st.caption("Построение математических графиков для курсовой работы")
-st.markdown("---")
-
 # Sidebar
 with st.sidebar:
-    st.subheader("Режим работы")
+    st.markdown("<div style='padding:0.75rem 1.1rem 0.5rem;font-size:0.7rem;font-weight:600;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;'>Навигация</div>", unsafe_allow_html=True)
     mode = st.radio(
-        "Выберите режим работы",
+        "Навигация",
         ["Построить график", "Загрузить Excel", "Мои графики", "Библиотека"],
         label_visibility="collapsed"
     )
 
-    st.markdown("---")
-
     if st.session_state.graph_history:
-        st.success(f"Построено графиков: {len(st.session_state.graph_history)}")
-        if st.button("Очистить всё", width="stretch"):
-            storage.clear_all_graphs()  # Очищаем постоянное хранилище
+        st.markdown("<div style='height:1px;background:#e2e8f0;margin:0.75rem 0;'></div>", unsafe_allow_html=True)
+        if st.button("Очистить графики", use_container_width=True):
+            storage.clear_all_graphs()
             st.session_state.graph_history = []
             st.session_state.current_graph = None
             st.rerun()
-
-    st.markdown("---")
 
 # ========== МОИ ГРАФИКИ ==========
 if mode == "Мои графики":
