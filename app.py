@@ -169,17 +169,10 @@ st.markdown("""
     /* Dataframe */
     .stDataFrame { border: 1px solid #e5e7eb; border-radius: 7px; }
 
-    /* Кнопка открытия боковой панели — прижата к левому краю */
+    /* Кнопка открытия боковой панели */
     [data-testid="collapsedControl"] {
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
         margin: 0 !important;
-        z-index: 9999 !important;
-    }
-    /* На случай если обёртка сдвигает кнопку */
-    [data-testid="collapsedControl"] > * {
-        margin: 0 !important;
+        padding: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -201,8 +194,28 @@ st.markdown("""
     var obs = new MutationObserver(noKeyboardOnSelects);
     obs.observe(document.body, {childList: true, subtree: true});
     noKeyboardOnSelects();
-    // Применяем перед каждым касанием — устраняет race condition при открытии expander
     document.addEventListener('pointerdown', noKeyboardOnSelects, true);
+
+    // Прижимаем кнопку открытия сайдбара к левому краю
+    function fixSidebarBtn() {
+        var el = document.querySelector('[data-testid="collapsedControl"]');
+        if (!el) return;
+        el.style.setProperty('position', 'fixed', 'important');
+        el.style.setProperty('left', '0', 'important');
+        el.style.setProperty('top', '0', 'important');
+        el.style.setProperty('margin', '0', 'important');
+        el.style.setProperty('z-index', '99999', 'important');
+        // Убираем transform у всех родителей (он ломает position:fixed)
+        var p = el.parentElement;
+        while (p && p !== document.body) {
+            var s = window.getComputedStyle(p).transform;
+            if (s && s !== 'none') p.style.setProperty('transform', 'none', 'important');
+            p = p.parentElement;
+        }
+    }
+    var sideObs = new MutationObserver(fixSidebarBtn);
+    sideObs.observe(document.body, {childList: true, subtree: true, attributes: true});
+    fixSidebarBtn();
 })();
 </script>
 """, unsafe_allow_html=True)
