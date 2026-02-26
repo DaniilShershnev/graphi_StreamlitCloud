@@ -46,8 +46,8 @@ st.markdown("""
     section[data-testid="stSidebar"] {
         background: #f8fafc !important;
         border-right: 1px solid #e2e8f0 !important;
-        min-width: 190px !important;
-        max-width: 190px !important;
+        min-width: 210px !important;
+        max-width: 210px !important;
         overflow: hidden !important;
     }
     section[data-testid="stSidebar"] > div { overflow: hidden !important; }
@@ -104,15 +104,15 @@ st.markdown("""
         transition: background 0.2s;
     }
     .stButton > button:hover { background: #1d4ed8; }
-    .stButton > button[kind="primary"] { background: #10b981; font-weight: 600; }
-    .stButton > button[kind="primary"]:hover { background: #059669; }
+    .stButton > button[kind="primary"] { background: #2563eb; font-weight: 600; }
+    .stButton > button[kind="primary"]:hover { background: #1d4ed8; }
 
-    /* Download button */
+    /* Download button — тот же синий */
     .stDownloadButton > button {
-        background: #10b981; color: white; border-radius: 7px;
-        font-weight: 500; min-height: 2.6rem;
+        background: #2563eb; color: white; border-radius: 7px;
+        font-weight: 500; min-height: 2.6rem; width: 100%;
     }
-    .stDownloadButton > button:hover { background: #059669; }
+    .stDownloadButton > button:hover { background: #1d4ed8; }
 
     /* ========== Поля ввода ========== */
     .stTextInput > div > div > input,
@@ -434,7 +434,7 @@ if mode == "Мои графики":
 # ========== БИБЛИОТЕКА ==========
 elif mode == "Библиотека":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("📚 Библиотека сохраненных данных")
+    st.subheader("Библиотека")
 
     tab1, tab2, tab3 = st.tabs(["Excel конфигурации", "Ручные настройки", "Экспорт/Импорт"])
 
@@ -460,7 +460,7 @@ elif mode == "Библиотека":
                         excel_data = output.getvalue()
 
                         st.download_button(
-                            "⬇️ Скачать",
+                            "Скачать",
                             data=excel_data,
                             file_name=f"{config_name}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -469,13 +469,13 @@ elif mode == "Библиотека":
                         )
                     with col2:
                         # Загрузить в редактор
-                        if st.button("📂 Загрузить", use_container_width=True, key=f"load_excel_{config_name}"):
+                        if st.button("Загрузить", use_container_width=True, key=f"load_excel_{config_name}"):
                             st.session_state.edited_df = config_df.copy()
-                            st.success(f"✅ Загружено в редактор")
+                            st.success(f"Загружено в редактор")
                             st.info("Перейдите в 'Загрузить Excel' для построения графиков")
                     with col3:
                         # Удалить
-                        if st.button("🗑️ Удалить", use_container_width=True, key=f"del_excel_{config_name}"):
+                        if st.button("Удалить", use_container_width=True, key=f"del_excel_{config_name}"):
                             del st.session_state.saved_excel_configs[config_name]
                             storage.delete_excel_config(config_name)  # Удаляем с диска
                             st.rerun()
@@ -498,7 +498,7 @@ elif mode == "Библиотека":
         st.markdown("#### 📤 Экспорт")
         st.caption("Сохраните всю библиотеку в один файл для переноса на другое устройство")
 
-        if st.button("📦 Экспортировать библиотеку", use_container_width=True):
+        if st.button("Экспорт библиотеки", use_container_width=True):
             # Используем встроенную функцию экспорта
             library_data = storage.export_library()
 
@@ -508,7 +508,7 @@ elif mode == "Библиотека":
             library_json = json.dumps(library_data, ensure_ascii=False, indent=2)
 
             st.download_button(
-                "⬇️ Скачать библиотеку (JSON)",
+                "Скачать библиотеку (JSON)",
                 data=library_json,
                 file_name=f"graph_library_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                 mime="application/json",
@@ -533,7 +533,7 @@ elif mode == "Библиотека":
                 # Восстанавливаем ручные настройки
                 st.session_state.saved_manual_configs.update(library_data.get('manual_configs', {}))
 
-                st.success(f"✅ Библиотека загружена! Дата экспорта: {library_data.get('timestamp', 'неизвестна')}")
+                st.success(f"Библиотека загружена! Дата экспорта: {library_data.get('timestamp', 'неизвестна')}")
                 st.rerun()
             except Exception as e:
                 st.error(f"Ошибка при импорте: {str(e)}")
@@ -576,17 +576,17 @@ elif mode == "Загрузить Excel":
 
         # Быстрая загрузка из библиотеки (перемещаем наверх)
         if st.session_state.saved_excel_configs:
-            with st.expander("📚 Быстрая загрузка из библиотеки", expanded=False):
+            with st.expander("Быстрая загрузка", expanded=False):
                 saved_config_name = st.selectbox(
                     "Выберите сохраненную конфигурацию",
                     ["Не выбрано"] + list(st.session_state.saved_excel_configs.keys()),
                     key="load_saved_config_top"
                 )
                 if saved_config_name != "Не выбрано":
-                    if st.button(f"📂 Загрузить '{saved_config_name}'", use_container_width=True):
+                    if st.button(f"Загрузить '{saved_config_name}'", use_container_width=True):
                         st.session_state.edited_df = st.session_state.saved_excel_configs[saved_config_name].copy()
                         st.session_state.current_config_name = saved_config_name
-                        st.success(f"✅ Загружена конфигурация '{saved_config_name}'")
+                        st.success(f"Загружена конфигурация '{saved_config_name}'")
                         st.rerun()
 
         st.info("Загрузите таблицу с конфигурациями графиков (.xlsx или .xls)")
@@ -641,12 +641,11 @@ elif mode == "Загрузить Excel":
                 # Обычный режим: заголовок + кнопка открытия редактора
                 _nc1, _nc2 = st.columns([8, 2])
                 with _nc1:
-                    st.markdown("### 📝 Редактор таблицы")
+                    st.markdown("### Редактор таблицы")
                 with _nc2:
-                    if st.button("⛶ Открыть редактор", use_container_width=True, key="btn_open_modal"):
+                    if st.button("Открыть редактор", use_container_width=True, key="btn_open_modal"):
                         st.session_state.table_modal = True
                         st.rerun()
-                st.caption("Стилус: выделить диапазон → тап на последнюю ячейку | Палец: редактирование текста")
 
             color_options_excel = ["red", "blue", "green", "orange", "purple", "cyan", "magenta", "yellow", "black", "gray", "brown", "lime", "navy", "maroon", "olive", "teal", "coral", "gold", "darkred", "deepskyblue", "crimson", "darkgreen", "indigo", "violet", "steelblue", "tomato", "darkorange", "lightgreen", "lightskyblue", "slategray"]
             linestyle_options = ["-", "--", ":", "-."]
@@ -1003,7 +1002,7 @@ function(params) {
             # Кнопки управления
             col1, col2, col3 = st.columns(3)
             with col1:
-                if st.button("↻ Сбросить изменения", use_container_width=True):
+                if st.button("Сбросить", use_container_width=True):
                     st.session_state.edited_df = df.copy()
                     st.rerun()
             with col2:
@@ -1014,7 +1013,7 @@ function(params) {
                 excel_data = output.getvalue()
 
                 st.download_button(
-                    label="⬇️ Скачать Excel",
+                    label="Скачать Excel",
                     data=excel_data,
                     file_name="edited_config.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1026,12 +1025,12 @@ function(params) {
                     st.session_state.show_save_dialog = False
 
                 # Кнопка открытия диалога
-                if st.button("💾 В библиотеку", use_container_width=True, help="Сохранить эту конфигурацию для быстрого доступа"):
+                if st.button("В библиотеку", use_container_width=True, help="Сохранить эту конфигурацию для быстрого доступа"):
                     st.session_state.show_save_dialog = not st.session_state.show_save_dialog
 
             # Диалог сохранения (вне колонок, чтобы занимал всю ширину)
             if st.session_state.get('show_save_dialog', False):
-                with st.expander("💾 Сохранить конфигурацию в библиотеку", expanded=True):
+                with st.expander("Сохранить в библиотеку", expanded=True):
                     col_a, col_b = st.columns([3, 1])
                     with col_a:
                         # Используем имя текущей конфигурации (из файла или библиотеки)
@@ -1044,19 +1043,19 @@ function(params) {
                     with col_b:
                         st.write("")  # Отступ
                         st.write("")  # Отступ для выравнивания
-                        if st.button("✅ Сохранить", key="save_confirm", type="primary"):
+                        if st.button("Сохранить", key="save_confirm", type="primary"):
                             if save_name and save_name.strip():
                                 # Сохраняем в session_state
                                 st.session_state.saved_excel_configs[save_name.strip()] = edited_df.copy()
                                 # Сохраняем на диск для постоянного хранения
                                 storage.save_excel_config(save_name.strip(), edited_df.copy())
-                                st.success(f"✅ Конфигурация '{save_name.strip()}' сохранена в библиотеке")
+                                st.success(f"Конфигурация '{save_name.strip()}' сохранена в библиотеке")
                                 st.session_state.show_save_dialog = False
                                 st.rerun()
                             else:
                                 st.error("⚠️ Введите имя конфигурации")
 
-            if st.button("🎨 Построить все графики", type="primary", width="stretch"):
+            if st.button("Построить все графики", type="primary", width="stretch"):
                 # Используем отредактированные данные вместо оригинальных
                 # Сохраняем во временный файл и загружаем заново
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx', mode='wb') as tmp_edited:
@@ -1573,7 +1572,7 @@ else:
             with ci1:
                 new_name_f = st.text_input("Имя в библиотеке", value=g_name_f, key="save_name_func_inline")
             with ci2:
-                if st.button("💾 Сохранить", key="save_lib_func_inline", use_container_width=True, type="primary"):
+                if st.button("Сохранить", key="save_lib_func_inline", use_container_width=True, type="primary"):
                     if st.session_state.graph_history and new_name_f.strip():
                         last = st.session_state.graph_history[-1]
                         storage.delete_graph(last['name'], last['timestamp'])
@@ -1581,9 +1580,9 @@ else:
                         storage.save_graph(new_name_f.strip(), new_ts, last['type'], last['svg_data'])
                         st.session_state.graph_history[-1]['name'] = new_name_f.strip()
                         st.session_state.graph_history[-1]['timestamp'] = new_ts
-                        st.success(f"✅ Сохранено: «{new_name_f.strip()}»")
+                        st.success(f"Сохранено: «{new_name_f.strip()}»")
             with ci3:
-                st.download_button("⬇️ SVG", st.session_state.current_graph,
+                st.download_button("Скачать SVG", st.session_state.current_graph,
                                    file_name=f"{g_name_f}.svg", mime="image/svg+xml",
                                    use_container_width=True, key="dl_func_inline")
 
@@ -1757,7 +1756,7 @@ else:
             with ci1:
                 new_name_ode = st.text_input("Имя в библиотеке", value=g_name_ode, key="save_name_ode_inline")
             with ci2:
-                if st.button("💾 Сохранить", key="save_lib_ode_inline", use_container_width=True, type="primary"):
+                if st.button("Сохранить", key="save_lib_ode_inline", use_container_width=True, type="primary"):
                     if st.session_state.graph_history and new_name_ode.strip():
                         last = st.session_state.graph_history[-1]
                         storage.delete_graph(last['name'], last['timestamp'])
@@ -1765,9 +1764,9 @@ else:
                         storage.save_graph(new_name_ode.strip(), new_ts, last['type'], last['svg_data'])
                         st.session_state.graph_history[-1]['name'] = new_name_ode.strip()
                         st.session_state.graph_history[-1]['timestamp'] = new_ts
-                        st.success(f"✅ Сохранено: «{new_name_ode.strip()}»")
+                        st.success(f"Сохранено: «{new_name_ode.strip()}»")
             with ci3:
-                st.download_button("⬇️ SVG", st.session_state.current_graph,
+                st.download_button("Скачать SVG", st.session_state.current_graph,
                                    file_name=f"{g_name_ode}.svg", mime="image/svg+xml",
                                    use_container_width=True, key="dl_ode_inline")
 
@@ -1903,7 +1902,7 @@ else:
             with ci1:
                 new_name_pp = st.text_input("Имя в библиотеке", value=g_name_pp, key="save_name_pp_inline")
             with ci2:
-                if st.button("💾 Сохранить", key="save_lib_pp_inline", use_container_width=True, type="primary"):
+                if st.button("Сохранить", key="save_lib_pp_inline", use_container_width=True, type="primary"):
                     if st.session_state.graph_history and new_name_pp.strip():
                         last = st.session_state.graph_history[-1]
                         storage.delete_graph(last['name'], last['timestamp'])
@@ -1911,9 +1910,9 @@ else:
                         storage.save_graph(new_name_pp.strip(), new_ts, last['type'], last['svg_data'])
                         st.session_state.graph_history[-1]['name'] = new_name_pp.strip()
                         st.session_state.graph_history[-1]['timestamp'] = new_ts
-                        st.success(f"✅ Сохранено: «{new_name_pp.strip()}»")
+                        st.success(f"Сохранено: «{new_name_pp.strip()}»")
             with ci3:
-                st.download_button("⬇️ SVG", st.session_state.current_graph,
+                st.download_button("Скачать SVG", st.session_state.current_graph,
                                    file_name=f"{g_name_pp}.svg", mime="image/svg+xml",
                                    use_container_width=True, key="dl_pp_inline")
 
@@ -1948,7 +1947,7 @@ if st.session_state.current_graph is not None and mode == "Построить г
         if 'show_rename_dialog' not in st.session_state:
             st.session_state.show_rename_dialog = False
 
-        if st.button("💾 Сохранить как...", width="stretch"):
+        if st.button("Сохранить как...", width="stretch"):
             st.session_state.show_rename_dialog = not st.session_state.show_rename_dialog
 
         if st.button("Построить новый", width="stretch"):
@@ -1957,7 +1956,7 @@ if st.session_state.current_graph is not None and mode == "Построить г
 
     # Диалог переименования графика
     if st.session_state.get('show_rename_dialog', False) and len(st.session_state.graph_history) > 0:
-        with st.expander("💾 Сохранить график под новым именем", expanded=True):
+        with st.expander("Сохранить график", expanded=True):
             last_graph = st.session_state.graph_history[-1]  # Последний добавленный график
 
             new_name = st.text_input(
@@ -1968,7 +1967,7 @@ if st.session_state.current_graph is not None and mode == "Построить г
 
             col_a, col_b = st.columns(2)
             with col_a:
-                if st.button("✅ Сохранить", key="rename_confirm", type="primary", use_container_width=True):
+                if st.button("Сохранить", key="rename_confirm", type="primary", use_container_width=True):
                     if new_name and new_name.strip():
                         # Обновляем имя последнего графика
                         old_name = last_graph['name']
@@ -1985,13 +1984,13 @@ if st.session_state.current_graph is not None and mode == "Построить г
                         st.session_state.graph_history[-1]['name'] = new_name.strip()
                         st.session_state.graph_history[-1]['timestamp'] = new_timestamp
 
-                        st.success(f"✅ График сохранен как '{new_name.strip()}'")
+                        st.success(f"Сохранено: '{new_name.strip()}'")
                         st.session_state.show_rename_dialog = False
                         st.rerun()
                     else:
                         st.error("⚠️ Введите имя графика")
             with col_b:
-                if st.button("❌ Отмена", key="rename_cancel", use_container_width=True):
+                if st.button("Отмена", key="rename_cancel", use_container_width=True):
                     st.session_state.show_rename_dialog = False
                     st.rerun()
 
