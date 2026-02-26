@@ -382,8 +382,7 @@ if mode == "Мои графики":
         elif sort_by == "По имени":
             filtered_graphs = sorted(filtered_graphs, key=lambda g: g['name'])
 
-        st.caption(f"Найдено графиков: {len(filtered_graphs)} из {len(st.session_state.graph_history)}")
-        st.markdown("---")
+        st.caption(f"Найдено: {len(filtered_graphs)}")
 
         for i in range(0, len(filtered_graphs), 2):
             cols = st.columns(2)
@@ -436,9 +435,8 @@ elif mode == "Библиотека":
         st.markdown("### Сохраненные Excel конфигурации")
 
         if not st.session_state.saved_excel_configs:
-            st.info("📝 Библиотека пуста. Сохраните конфигурацию в разделе 'Загрузить Excel'")
+            st.info("Библиотека пуста")
         else:
-            st.success(f"Сохранено конфигураций: {len(st.session_state.saved_excel_configs)}")
 
             for config_name in list(st.session_state.saved_excel_configs.keys()):
                 with st.expander(f"📊 {config_name}", expanded=False):
@@ -1025,7 +1023,6 @@ function(params) {
 
             # Диалог сохранения (вне колонок, чтобы занимал всю ширину)
             if st.session_state.get('show_save_dialog', False):
-                st.markdown("---")
                 with st.expander("💾 Сохранить конфигурацию в библиотеку", expanded=True):
                     col_a, col_b = st.columns([3, 1])
                     with col_a:
@@ -1051,8 +1048,6 @@ function(params) {
                             else:
                                 st.error("⚠️ Введите имя конфигурации")
 
-            st.markdown("---")
-
             if st.button("🎨 Построить все графики", type="primary", width="stretch"):
                 # Используем отредактированные данные вместо оригинальных
                 # Сохраняем во временный файл и загружаем заново
@@ -1077,9 +1072,6 @@ function(params) {
                         first_row = rows[0]
                         graph_type = first_row.get('graph_type', first_row.get('type', 'ode_time'))
 
-                        # DEBUG: показываем что читаем из первой строки
-                        if 'linestyle' in first_row or 'line_style' in first_row or 'ls' in first_row:
-                            st.info(f"DEBUG {output_file}: linestyle колонка найдена. Значение: {first_row.get('linestyle', first_row.get('line_style', first_row.get('ls')))}")
 
                         # Создаем плоттер
                         if graph_type == 'function':
@@ -1557,14 +1549,12 @@ else:
 
                 st.session_state.last_built_tab = "function"
                 st.session_state.pop('save_name_func_inline', None)
-                st.success("График успешно построен")
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
 
         # Inline preview + сохранение в библиотеку
         if st.session_state.current_graph is not None and st.session_state.get('last_built_tab') == 'function':
-            st.markdown("---")
             svg_b64 = base64.b64encode(st.session_state.current_graph).decode()
             st.markdown(
                 f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">',
@@ -1743,14 +1733,12 @@ else:
 
                 st.session_state.last_built_tab = "ode"
                 st.session_state.pop('save_name_ode_inline', None)
-                st.success("ОДУ успешно решена")
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
 
         # Inline preview + сохранение в библиотеку
         if st.session_state.current_graph is not None and st.session_state.get('last_built_tab') == 'ode':
-            st.markdown("---")
             svg_b64 = base64.b64encode(st.session_state.current_graph).decode()
             st.markdown(
                 f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">',
@@ -1891,14 +1879,12 @@ else:
 
                 st.session_state.last_built_tab = "phase"
                 st.session_state.pop('save_name_pp_inline', None)
-                st.success("Фазовый портрет успешно построен")
 
             except Exception as e:
                 st.error(f"Ошибка: {str(e)}")
 
         # Inline preview + сохранение в библиотеку
         if st.session_state.current_graph is not None and st.session_state.get('last_built_tab') == 'phase':
-            st.markdown("---")
             svg_b64 = base64.b64encode(st.session_state.current_graph).decode()
             st.markdown(
                 f'<img src="data:image/svg+xml;base64,{svg_b64}" style="width:100%;border-radius:8px;margin-bottom:0.75rem;">',
@@ -1963,7 +1949,6 @@ if st.session_state.current_graph is not None and mode == "Построить г
 
     # Диалог переименования графика
     if st.session_state.get('show_rename_dialog', False) and len(st.session_state.graph_history) > 0:
-        st.markdown("---")
         with st.expander("💾 Сохранить график под новым именем", expanded=True):
             last_graph = st.session_state.graph_history[-1]  # Последний добавленный график
 
@@ -2004,19 +1989,3 @@ if st.session_state.current_graph is not None and mode == "Построить г
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Footer
-st.markdown("---")
-import subprocess
-import os
-
-# Получаем информацию о последнем коммите Git
-try:
-    git_hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'],
-                                       cwd=os.path.dirname(__file__)).decode('utf-8').strip()
-    git_date = subprocess.check_output(['git', 'log', '-1', '--format=%cd', '--date=format:%Y-%m-%d %H:%M'],
-                                       cwd=os.path.dirname(__file__)).decode('utf-8').strip()
-    version_info = f"v{git_hash} ({git_date})"
-except:
-    version_info = "unknown"
-
-st.caption(f"🔄 {version_info}")
