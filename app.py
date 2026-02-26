@@ -197,25 +197,15 @@ st.markdown("""
     document.addEventListener('pointerdown', noKeyboardOnSelects, true);
 
     // Прижимаем кнопку открытия сайдбара к левому краю
+    // Streamlit каждый рендер ставит left=<ширина сайдбара> — перебиваем setInterval
     function fixSidebarBtn() {
         var el = document.querySelector('[data-testid="collapsedControl"]');
         if (!el) return;
-        el.style.setProperty('position', 'fixed', 'important');
-        el.style.setProperty('left', '0', 'important');
-        el.style.setProperty('top', '0', 'important');
-        el.style.setProperty('margin', '0', 'important');
-        el.style.setProperty('z-index', '99999', 'important');
-        // Убираем transform у всех родителей (он ломает position:fixed)
-        var p = el.parentElement;
-        while (p && p !== document.body) {
-            var s = window.getComputedStyle(p).transform;
-            if (s && s !== 'none') p.style.setProperty('transform', 'none', 'important');
-            p = p.parentElement;
-        }
+        var rect = el.getBoundingClientRect();
+        if (rect.left === 0) return;
+        el.style.cssText += ';position:fixed!important;left:0px!important;top:0px!important;margin:0px!important;transform:none!important;z-index:99999!important;';
     }
-    var sideObs = new MutationObserver(fixSidebarBtn);
-    sideObs.observe(document.body, {childList: true, subtree: true, attributes: true});
-    fixSidebarBtn();
+    setInterval(fixSidebarBtn, 200);
 })();
 </script>
 """, unsafe_allow_html=True)
