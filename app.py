@@ -46,13 +46,13 @@ st.markdown("""
     section[data-testid="stSidebar"] {
         background: #f8fafc !important;
         border-right: 1px solid #e2e8f0 !important;
-        min-width: 210px !important;
-        max-width: 210px !important;
+        min-width: 200px !important;
+        max-width: 200px !important;
         overflow: hidden !important;
     }
     section[data-testid="stSidebar"] > div { overflow: hidden !important; }
     [data-testid="stSidebar"] .block-container {
-        padding: 1.5rem 0 1rem 0 !important;
+        padding: 1.25rem 0 1rem 0 !important;
         overflow: hidden !important;
     }
 
@@ -64,13 +64,14 @@ st.markdown("""
         border: none !important;
         border-left: 3px solid transparent !important;
         border-radius: 0 !important;
-        padding: 0.65rem 1.1rem !important;
+        padding: 0.6rem 1rem !important;
         color: #64748b !important;
         font-weight: 400 !important;
-        font-size: 0.9rem !important;
+        font-size: 0.875rem !important;
         cursor: pointer;
         transition: all 0.15s;
         width: 100%;
+        white-space: nowrap !important;
     }
     .stRadio > div > label:hover {
         background: #f1f5f9 !important;
@@ -85,6 +86,25 @@ st.markdown("""
     }
     /* Скрыть radio-кружок */
     .stRadio > div > label > div:first-child { display: none !important; }
+
+    /* Кнопка "Очистить" в сайдбаре — как текстовая ссылка */
+    section[data-testid="stSidebar"] .stButton > button {
+        background: transparent !important;
+        color: #94a3b8 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        text-align: left !important;
+        padding: 0.6rem 1rem !important;
+        font-size: 0.875rem !important;
+        font-weight: 400 !important;
+        min-height: auto !important;
+        box-shadow: none !important;
+        justify-content: flex-start !important;
+    }
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: #fef2f2 !important;
+        color: #ef4444 !important;
+    }
 
     /* Скрыть .card артефакты (это inline-div без реального содержимого) */
     .card { display: none !important; }
@@ -159,6 +179,15 @@ st.markdown("""
     /* Выравнивание колонок по верху */
     [data-testid="stHorizontalBlock"] { align-items: flex-start !important; }
     [data-testid="column"] { padding-top: 0 !important; }
+
+    /* Одинаковая высота кнопок и download-кнопок в одной строке */
+    [data-testid="stHorizontalBlock"] .stButton > button,
+    [data-testid="stHorizontalBlock"] .stDownloadButton > button {
+        height: 2.6rem !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
 
     /* Убрать лишние вертикальные отступы */
     [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] { gap: 0.4rem; }
