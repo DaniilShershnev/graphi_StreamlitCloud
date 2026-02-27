@@ -301,22 +301,24 @@ st.markdown("""
 st.markdown("""
 <script>
 (function() {
-    // ── Ключевой фикс для iPad: перехватываем HTMLInputElement.prototype.focus ──
-    // BaseWeb вызывает input.focus() программно → iOS видит фокус и показывает
-    // клавиатуру ДО того как сработают event-хэндлеры. Единственный надёжный способ —
-    // поставить inputmode="none" ВНУТРИ самого вызова focus(), ДО передачи управления браузеру.
+    // ── Фикс клавиатуры на iPad: НЕ фокусируем select-инпуты на touch-устройствах ──
+    // iOS Safari игнорирует inputmode="none" поставленный через JS после факта.
+    // Решение: на touch-устройстве вообще не вызывать origFocus() для combobox/select.
+    // Дропдаун открывается через touch-хэндлер контейнера без фокуса инпута.
     (function() {
+        var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        if (!isTouchDevice) return;
         var _origFocus = HTMLInputElement.prototype.focus;
         HTMLInputElement.prototype.focus = function(opts) {
-            var isCombo = this.getAttribute('role') === 'combobox' ||
-                          !!(this.closest && this.closest('[data-baseweb="select"]')) ||
-                          !!(this.closest && this.closest('[data-baseweb="popover"]'));
-            if (isCombo) {
-                this.setAttribute('inputmode', 'none');
-                this.setAttribute('autocomplete', 'off');
-                this.setAttribute('autocorrect', 'off');
-                this.setAttribute('autocapitalize', 'none');
-                this.setAttribute('spellcheck', 'false');
+            var el = this;
+            var isDropdown = (
+                el.getAttribute('role') === 'combobox' ||
+                !!(el.closest && el.closest('[data-baseweb="select"]')) ||
+                !!(el.closest && el.closest('[data-baseweb="popover"]')) ||
+                !!(el.closest && el.closest('[data-baseweb="menu"]'))
+            );
+            if (isDropdown) {
+                return; // не фокусируем — клавиатура не появится
             }
             return _origFocus.call(this, opts);
         };
