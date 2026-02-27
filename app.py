@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as st_components
 import sys
 import os
 import tempfile
@@ -46,8 +47,8 @@ st.markdown("""
     section[data-testid="stSidebar"] {
         background: #fafafa !important;
         border-right: 1px solid #f0f0f0 !important;
-        min-width: 180px !important;
-        max-width: 180px !important;
+        min-width: 200px !important;
+        max-width: 200px !important;
         overflow: hidden !important;
     }
     section[data-testid="stSidebar"] > div { overflow: hidden !important; }
@@ -302,6 +303,22 @@ st.markdown("""
     noKeyboardOnSelects();
     document.addEventListener('pointerdown', noKeyboardOnSelects, true);
 
+    // Дополнительно: при получении фокуса select-инпутом — убираем клавиатуру немедленно
+    document.addEventListener('focusin', function(e) {
+        var el = e.target;
+        if (!el || el.tagName !== 'INPUT') return;
+        var inSelect = (
+            el.getAttribute('role') === 'combobox' ||
+            (el.closest && el.closest('[data-baseweb="select"]')) ||
+            (el.closest && el.closest('[data-baseweb="popover"]'))
+        );
+        if (inSelect) {
+            el.setAttribute('inputmode', 'none');
+            el.setAttribute('readonly', 'true');
+            el.setAttribute('autocomplete', 'off');
+        }
+    }, true);
+
     // Прижимаем кнопку открытия сайдбара к левому краю
     // Streamlit каждый рендер ставит left=<ширина сайдбара> — перебиваем setInterval
     function fixSidebarBtn() {
@@ -515,10 +532,10 @@ if mode == "Мои графики":
                                 unsafe_allow_html=True
                             )
 
-                            col_a, col_b = st.columns(2)
+                            col_a, col_b, col_c = st.columns(3)
                             with col_a:
                                 st.download_button(
-                                    "Скачать",
+                                    "Скачать SVG",
                                     graph['svg_data'],
                                     file_name=f"{graph['name']}.svg",
                                     mime="image/svg+xml",
@@ -526,6 +543,29 @@ if mode == "Мои графики":
                                     key=f"dl_{i}_{j}"
                                 )
                             with col_b:
+                                # PNG-кнопка через JS canvas (без доп. зависимостей)
+                                _svg_b64_safe = base64.b64encode(graph['svg_data']).decode()
+                                _fname = graph['name'].replace("'", "").replace('"', '')
+                                st_components.html(f"""<style>button{{width:100%;height:2.75rem;background:#111827;color:white;border:none;border-radius:6px;font-size:13.5px;font-weight:400;cursor:pointer;font-family:Inter,sans-serif;letter-spacing:0.025em;}}</style>
+<script>
+function savePNG(){{
+    var img=new Image();
+    var blob=new Blob([atob('{_svg_b64_safe}')],{{type:'image/svg+xml;charset=utf-8'}});
+    var url=URL.createObjectURL(blob);
+    img.onload=function(){{
+        var c=document.createElement('canvas');
+        c.width=img.naturalWidth||1200;c.height=img.naturalHeight||900;
+        var ctx=c.getContext('2d');
+        ctx.fillStyle='white';ctx.fillRect(0,0,c.width,c.height);
+        ctx.drawImage(img,0,0);
+        var a=document.createElement('a');
+        a.download='{_fname}.png';a.href=c.toDataURL('image/png');
+        document.body.appendChild(a);a.click();document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }};img.src=url;
+}}
+</script><button onclick="savePNG()">Сохранить PNG</button>""", height=44)
+                            with col_c:
                                 if st.button("Удалить", width="stretch", key=f"del_{i}_{j}"):
                                     # Удаляем из постоянного хранилища
                                     storage.delete_graph(graph['name'], graph['timestamp'])
@@ -656,7 +696,17 @@ elif mode == "Загрузить Excel":
             section[data-testid="stSidebar"] { display: none !important; }
             header[data-testid="stHeader"]   { display: none !important; }
             footer                           { display: none !important; }
-            body, .stApp, .main             { background: white !important; }
+            /* Запрещаем скролл страницы в модальном режиме */
+            html { overflow: hidden !important; }
+            body {
+                overflow: hidden !important;
+                position: fixed !important;
+                width: 100% !important;
+                height: 100% !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
+            body, .stApp, .main { background: white !important; }
             .main {
                 padding: 0 !important;
                 margin:  0 !important;
@@ -664,15 +714,24 @@ elif mode == "Загрузить Excel":
             .main .block-container {
                 background:    white !important;
                 border-radius: 0 !important;
-                padding:       4px 6px 0 6px !important;
-                max-width:     100% !important;
-                min-height:    100vh !important;
+                padding:       0 4px !important;
+                max-width:     100vw !important;
+                width:         100vw !important;
+                overflow:      hidden !important;
                 box-shadow:    none !important;
             }
-            /* Растягиваем iframe таблицы на весь оставшийся экран */
+            /* Кнопка ✕ — компактная */
+            [data-testid="stHorizontalBlock"] .stButton > button {
+                height: 2.25rem !important;
+                min-height: 2.25rem !important;
+                padding: 0 0.75rem !important;
+            }
+            /* Iframe таблицы — весь оставшийся экран */
             iframe[title="st_aggrid.agGrid"] {
-                height: calc(100vh - 56px) !important;
-                min-height: calc(100vh - 56px) !important;
+                height: calc(100vh - 44px) !important;
+                min-height: calc(100vh - 44px) !important;
+                width: 100% !important;
+                display: block !important;
             }
         </style>""", unsafe_allow_html=True)
         uploaded_file = None
@@ -764,7 +823,7 @@ elif mode == "Загрузить Excel":
                                  'isoclines_linestyle_ds', 'isoclines_linestyle_dw']
             select_cols_type  = ['graph_type', 'type']
 
-            _tbl_height = 1200 if st.session_state.get('table_modal', False) else 420
+            _tbl_height = 9000 if st.session_state.get('table_modal', False) else 420
 
             if AGGRID_AVAILABLE:
                 # --- AgGrid с fill handle (pen-only) и номерами строк ---
