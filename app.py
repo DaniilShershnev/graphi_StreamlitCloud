@@ -34,175 +34,252 @@ st.set_page_config(
 # CSS
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
     * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
-    /* Основной фон — белый */
+    /* ===== ФОНЫ ===== */
     .main, .stApp { background: #ffffff !important; }
-    .block-container { padding: 1.25rem 2rem !important; max-width: 1600px; }
+    .block-container { padding: 2rem 2.5rem !important; max-width: 1500px; }
 
-    /* ========== SIDEBAR — компактное меню ========== */
+    /* ===== SIDEBAR ===== */
     section[data-testid="stSidebar"] {
-        background: #f8fafc !important;
-        border-right: 1px solid #e2e8f0 !important;
-        min-width: 200px !important;
-        max-width: 200px !important;
+        background: #fafafa !important;
+        border-right: 1px solid #f0f0f0 !important;
+        min-width: 180px !important;
+        max-width: 180px !important;
         overflow: hidden !important;
     }
     section[data-testid="stSidebar"] > div { overflow: hidden !important; }
     [data-testid="stSidebar"] .block-container {
-        padding: 1.25rem 0 1rem 0 !important;
+        padding: 2rem 0 1rem 0 !important;
         overflow: hidden !important;
     }
 
-    /* Убираем кружки у radio и делаем nav-стиль */
+    /* ===== НАВИГАЦИЯ (radio → nav items) ===== */
     .stRadio > label { display: none !important; }
     .stRadio > div { gap: 0 !important; flex-direction: column !important; }
     .stRadio > div > label {
         background: transparent !important;
         border: none !important;
-        border-left: 3px solid transparent !important;
+        border-left: 2px solid transparent !important;
         border-radius: 0 !important;
-        padding: 0.6rem 1rem !important;
-        color: #64748b !important;
+        padding: 0.55rem 1.25rem !important;
+        color: #b0b8c1 !important;
         font-weight: 400 !important;
-        font-size: 0.875rem !important;
+        font-size: 0.8125rem !important;
         cursor: pointer;
-        transition: all 0.15s;
+        transition: all 0.12s;
         width: 100%;
+        letter-spacing: 0.01em;
         white-space: nowrap !important;
     }
     .stRadio > div > label:hover {
-        background: #f1f5f9 !important;
-        color: #334155 !important;
-        border-left-color: #cbd5e1 !important;
+        background: transparent !important;
+        color: #374151 !important;
+        border-left-color: #e5e7eb !important;
     }
     .stRadio > div > label[data-checked="true"] {
-        background: #eff6ff !important;
-        color: #2563eb !important;
-        border-left-color: #2563eb !important;
-        font-weight: 600 !important;
+        background: transparent !important;
+        color: #111827 !important;
+        border-left-color: #111827 !important;
+        font-weight: 500 !important;
     }
-    /* Скрыть radio-кружок */
     .stRadio > div > label > div:first-child { display: none !important; }
 
-    /* Кнопка "Очистить" в сайдбаре — как текстовая ссылка */
+    /* Кнопка в сайдбаре (Очистить и пр.) */
     section[data-testid="stSidebar"] .stButton > button {
         background: transparent !important;
-        color: #94a3b8 !important;
+        color: #d1d5db !important;
         border: none !important;
         border-radius: 0 !important;
         text-align: left !important;
-        padding: 0.6rem 1rem !important;
-        font-size: 0.875rem !important;
+        padding: 0.55rem 1.25rem !important;
+        font-size: 0.8125rem !important;
         font-weight: 400 !important;
         min-height: auto !important;
         box-shadow: none !important;
         justify-content: flex-start !important;
     }
     section[data-testid="stSidebar"] .stButton > button:hover {
-        background: #fef2f2 !important;
+        background: transparent !important;
         color: #ef4444 !important;
     }
 
-    /* Скрыть .card артефакты (это inline-div без реального содержимого) */
+    /* Скрыть .card артефакты */
     .card { display: none !important; }
     .gallery-card { display: none !important; }
 
-    /* ========== Кнопки ========== */
+    /* ===== КНОПКИ (основные) ===== */
     .stButton > button {
-        background: #2563eb;
+        background: #111827;
         color: white;
         border: none;
-        border-radius: 7px;
-        padding: 0.6rem 1.2rem;
-        font-size: 0.9rem;
-        font-weight: 500;
+        border-radius: 6px;
+        padding: 0.7rem 1.5rem;
+        font-size: 0.875rem;
+        font-weight: 400;
+        letter-spacing: 0.025em;
         width: 100%;
-        min-height: 2.6rem;
-        transition: background 0.2s;
+        min-height: 2.75rem;
+        transition: background 0.15s;
+        box-shadow: none !important;
     }
-    .stButton > button:hover { background: #1d4ed8; }
-    .stButton > button[kind="primary"] { background: #2563eb; font-weight: 600; }
-    .stButton > button[kind="primary"]:hover { background: #1d4ed8; }
+    .stButton > button:hover { background: #1f2937; }
+    .stButton > button:active { background: #374151; }
+    .stButton > button[kind="primary"] { background: #111827; font-weight: 500; }
+    .stButton > button[kind="primary"]:hover { background: #1f2937; }
 
-    /* Download button — тот же синий */
+    /* Download button — ghost style */
     .stDownloadButton > button {
-        background: #2563eb; color: white; border-radius: 7px;
-        font-weight: 500; min-height: 2.6rem; width: 100%;
+        background: transparent;
+        color: #374151;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-weight: 400;
+        min-height: 2.75rem;
+        width: 100%;
+        transition: all 0.15s;
+        box-shadow: none !important;
     }
-    .stDownloadButton > button:hover { background: #1d4ed8; }
+    .stDownloadButton > button:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+    }
 
-    /* ========== Поля ввода ========== */
+    /* ===== ПОЛЯ ВВОДА ===== */
     .stTextInput > div > div > input,
     .stNumberInput > div > div > input,
     .stTextArea textarea {
-        border-radius: 7px;
-        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        border: 1px solid #f0f0f0;
         padding: 0.6rem 0.75rem;
-        font-size: 0.9rem;
-        background: white;
+        font-size: 0.875rem;
+        background: #fafafa;
+        color: #111827;
+        transition: border-color 0.15s, background 0.15s;
+        box-shadow: none !important;
     }
     .stTextInput > div > div > input:focus,
-    .stNumberInput > div > div > input:focus {
-        border-color: #2563eb;
-        box-shadow: 0 0 0 2px rgba(37,99,235,0.12);
+    .stNumberInput > div > div > input:focus,
+    .stTextArea textarea:focus {
+        border-color: #d1d5db !important;
+        background: white !important;
+        box-shadow: none !important;
     }
     .stSelectbox > div > div {
-        border-radius: 7px;
-        border: 1px solid #d1d5db;
-        background: white;
+        border-radius: 6px;
+        border: 1px solid #f0f0f0;
+        background: #fafafa;
+        font-size: 0.875rem;
+        box-shadow: none !important;
     }
 
-    /* ========== Tabs ========== */
+    /* Лейблы — маленькие uppercase */
+    .stTextInput label,
+    .stNumberInput label,
+    .stSelectbox label,
+    .stTextArea label,
+    .stSlider label,
+    .stCheckbox label {
+        font-size: 0.6875rem !important;
+        color: #b0b8c1 !important;
+        font-weight: 500 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.07em !important;
+        margin-bottom: 0.2rem !important;
+    }
+
+    /* ===== СЛАЙДЕРЫ ===== */
+    .stSlider > div > div > div > div { background: #111827 !important; }
+    .stSlider [data-testid="stThumbValue"] {
+        color: #9ca3af !important;
+        font-size: 0.7rem !important;
+        font-weight: 400 !important;
+    }
+
+    /* ===== ТАБЫ ===== */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 0.25rem;
-        border-bottom: 1px solid #e5e7eb;
-        margin-bottom: 1rem;
+        gap: 0;
+        border-bottom: 1px solid #f0f0f0;
+        margin-bottom: 1.75rem;
+        background: transparent;
     }
     .stTabs [data-baseweb="tab"] {
         padding: 0.6rem 1.25rem;
-        font-weight: 500;
-        font-size: 0.9rem;
-        color: #6b7280;
-        border-radius: 6px 6px 0 0;
-        border-bottom: 2px solid transparent;
+        font-weight: 400;
+        font-size: 0.875rem;
+        color: #b0b8c1;
+        border-radius: 0;
+        border-bottom: 1.5px solid transparent;
+        margin-bottom: -1px;
+        letter-spacing: 0.01em;
+        transition: color 0.1s;
     }
-    .stTabs [data-baseweb="tab"]:hover { color: #374151; background: #f9fafb; }
+    .stTabs [data-baseweb="tab"]:hover { color: #374151; background: transparent; }
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #2563eb;
-        border-bottom-color: #2563eb;
+        color: #111827;
+        border-bottom-color: #111827;
         background: transparent;
+        font-weight: 500;
     }
 
-    /* Выравнивание колонок по верху */
+    /* ===== ЗАГОЛОВКИ ===== */
+    h1 {
+        font-weight: 300 !important;
+        font-size: 1.375rem !important;
+        color: #111827 !important;
+        letter-spacing: -0.025em !important;
+        margin-bottom: 1.75rem !important;
+    }
+    h2 {
+        font-weight: 400 !important;
+        font-size: 0.9375rem !important;
+        color: #374151 !important;
+    }
+    h3 {
+        font-weight: 500 !important;
+        font-size: 0.8125rem !important;
+        color: #9ca3af !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+    }
+    .stMarkdown h3, .stMarkdown h2 {
+        border-bottom: 1px solid #f5f5f5;
+        padding-bottom: 0.5rem;
+        margin-top: 1.25rem;
+        margin-bottom: 0.75rem;
+    }
+
+    /* ===== LAYOUT ===== */
     [data-testid="stHorizontalBlock"] { align-items: flex-start !important; }
     [data-testid="column"] { padding-top: 0 !important; }
 
-    /* Одинаковая высота кнопок и download-кнопок в одной строке */
     [data-testid="stHorizontalBlock"] .stButton > button,
     [data-testid="stHorizontalBlock"] .stDownloadButton > button {
-        height: 2.6rem !important;
+        height: 2.75rem !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
     }
 
-    /* Убрать лишние вертикальные отступы */
-    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] { gap: 0.4rem; }
+    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlock"] { gap: 0.45rem; }
 
-    /* Прогресс */
-    .stProgress > div > div { background: #2563eb; }
+    /* ===== ПРОЧЕЕ ===== */
+    .stProgress > div > div { background: #111827; }
 
-    /* Dataframe */
-    .stDataFrame { border: 1px solid #e5e7eb; border-radius: 7px; }
-
-    /* Кнопка открытия боковой панели */
-    [data-testid="collapsedControl"] {
-        margin: 0 !important;
-        padding: 0 !important;
+    .stDataFrame {
+        border: 1px solid #f0f0f0;
+        border-radius: 6px;
+        overflow: hidden;
     }
+
+    hr { border-color: #f5f5f5 !important; margin: 1.25rem 0 !important; }
+
+    [data-testid="collapsedControl"] { margin: 0 !important; padding: 0 !important; }
+
+    .stTooltipIcon { color: #d1d5db !important; }
 </style>
 """, unsafe_allow_html=True)
 
