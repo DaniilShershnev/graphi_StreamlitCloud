@@ -301,35 +301,42 @@ st.markdown("""
 st.markdown("""
 <script>
 (function() {
+    // ── Ключевой фикс для iPad: перехватываем HTMLInputElement.prototype.focus ──
+    // BaseWeb вызывает input.focus() программно → iOS видит фокус и показывает
+    // клавиатуру ДО того как сработают event-хэндлеры. Единственный надёжный способ —
+    // поставить inputmode="none" ВНУТРИ самого вызова focus(), ДО передачи управления браузеру.
+    (function() {
+        var _origFocus = HTMLInputElement.prototype.focus;
+        HTMLInputElement.prototype.focus = function(opts) {
+            var isCombo = this.getAttribute('role') === 'combobox' ||
+                          !!(this.closest && this.closest('[data-baseweb="select"]')) ||
+                          !!(this.closest && this.closest('[data-baseweb="popover"]'));
+            if (isCombo) {
+                this.setAttribute('inputmode', 'none');
+                this.setAttribute('autocomplete', 'off');
+                this.setAttribute('autocorrect', 'off');
+                this.setAttribute('autocapitalize', 'none');
+                this.setAttribute('spellcheck', 'false');
+            }
+            return _origFocus.call(this, opts);
+        };
+    })();
+
     function noKeyboardOnSelects() {
-        var attrs = ['inputmode', 'readonly', 'autocomplete', 'autocorrect', 'autocapitalize', 'spellcheck'];
-        var vals  = ['none',      'true',     'off',          'off',         'none',            'false'];
         document.querySelectorAll(
-            '[data-baseweb="select"] input, input[role="combobox"]'
+            '[data-baseweb="select"] input, input[role="combobox"], [data-baseweb="popover"] input'
         ).forEach(function(el) {
-            attrs.forEach(function(a, i) { el.setAttribute(a, vals[i]); });
+            el.setAttribute('inputmode', 'none');
+            el.setAttribute('autocomplete', 'off');
+            el.setAttribute('autocorrect', 'off');
+            el.setAttribute('autocapitalize', 'none');
+            el.setAttribute('spellcheck', 'false');
         });
     }
     var obs = new MutationObserver(noKeyboardOnSelects);
     obs.observe(document.body, {childList: true, subtree: true});
     noKeyboardOnSelects();
     document.addEventListener('pointerdown', noKeyboardOnSelects, true);
-
-    // Дополнительно: при получении фокуса select-инпутом — убираем клавиатуру немедленно
-    document.addEventListener('focusin', function(e) {
-        var el = e.target;
-        if (!el || el.tagName !== 'INPUT') return;
-        var inSelect = (
-            el.getAttribute('role') === 'combobox' ||
-            (el.closest && el.closest('[data-baseweb="select"]')) ||
-            (el.closest && el.closest('[data-baseweb="popover"]'))
-        );
-        if (inSelect) {
-            el.setAttribute('inputmode', 'none');
-            el.setAttribute('readonly', 'true');
-            el.setAttribute('autocomplete', 'off');
-        }
-    }, true);
 
     // Прижимаем кнопку открытия сайдбара к левому краю
     // Streamlit каждый рендер ставит left=<ширина сайдбара> — перебиваем setInterval
