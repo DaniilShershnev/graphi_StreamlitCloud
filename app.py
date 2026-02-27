@@ -281,6 +281,18 @@ st.markdown("""
     [data-testid="collapsedControl"] { margin: 0 !important; padding: 0 !important; }
 
     .stTooltipIcon { color: #d1d5db !important; }
+
+    /* ===== iPad: блокируем прямой фокус на input внутри selectbox =====
+       pointer-events:none на input → тач идёт на контейнер (dropdown открывается),
+       но input не фокусируется напрямую → клавиатура не всплывает              */
+    [data-baseweb="select"] input,
+    input[role="combobox"],
+    [data-baseweb="popover"] input {
+        pointer-events: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        caret-color: transparent !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -804,10 +816,17 @@ elif mode == "Загрузить Excel":
                         st.rerun()
             else:
                 # Обычный режим: заголовок + кнопка открытия редактора
-                _nc1, _nc2 = st.columns([8, 2])
+                _nc1, _nc2, _nc3 = st.columns([6, 2, 2])
                 with _nc1:
                     st.markdown("### Редактор таблицы")
                 with _nc2:
+                    if st.button("+ Строка", use_container_width=True, key="btn_add_row"):
+                        _empty = {col: '' for col in df.columns}
+                        st.session_state.edited_df = pd.concat(
+                            [df, pd.DataFrame([_empty])], ignore_index=True
+                        )
+                        st.rerun()
+                with _nc3:
                     if st.button("Открыть редактор", use_container_width=True, key="btn_open_modal"):
                         st.session_state.table_modal = True
                         st.rerun()
@@ -1053,6 +1072,46 @@ function(params) {
             }
         }, 80);
     }, true);
+
+    // === КНОПКА «+ СТРОКА» — добавить пустую строку в конец ===
+    var addRowBtn = document.createElement('button');
+    addRowBtn.textContent = '+ Строка';
+    addRowBtn.style.cssText = [
+        'position:fixed', 'bottom:20px', 'right:10px', 'z-index:9999',
+        'background:#111827', 'color:white', 'border:none', 'border-radius:10px',
+        'padding:10px 20px', 'font-size:15px', 'font-weight:600',
+        'cursor:pointer',
+        'box-shadow:0 4px 18px rgba(0,0,0,0.4)',
+        '-webkit-tap-highlight-color:transparent',
+        'touch-action:manipulation'
+    ].join(';');
+    document.body.appendChild(addRowBtn);
+
+    addRowBtn.addEventListener('pointerup', function(e) {
+        e.stopPropagation();
+        // Собираем все колонки (кроме '#') и создаём пустую строку
+        var allCols = [];
+        try {
+            var gc = params.columnApi ? params.columnApi.getAllGridColumns() : [];
+            gc.forEach(function(col) {
+                var id = col.getColId ? col.getColId() : (col.colId || col.field || '');
+                if (id && id !== '#') allCols.push(id);
+            });
+        } catch(ex) {}
+        // Получаем данные первой строки как шаблон ключей
+        if (allCols.length === 0) {
+            var firstRow = api.getDisplayedRowAtIndex(0);
+            if (firstRow) allCols = Object.keys(firstRow.data).filter(function(k){ return k !== '#'; });
+        }
+        var newRow = {};
+        allCols.forEach(function(k) { newRow[k] = ''; });
+        api.applyTransaction({ add: [newRow] });
+        // Скроллим к последней строке
+        setTimeout(function() {
+            var last = api.getDisplayedRowCount() - 1;
+            if (last >= 0) api.ensureIndexVisible(last, 'bottom');
+        }, 60);
+    });
 
     // === СЖАТИЕ APPLE PENCIL PRO → открыть редактор ячейки ===
     function openCellEditor() {
