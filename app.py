@@ -296,57 +296,42 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Глобальный JS: только подавление клавиатуры в selectbox/combobox главного фрейма
-# (AG Grid находится в iframe — его логика перенесена в onGridReady)
+# Глобальный JS: подавление клавиатуры через touchstart preventDefault
+# Это единственный надёжный способ на iOS — перехватываем touchstart на select-контейнере,
+# вызываем preventDefault() (браузер не откроет клавиатуру),
+# затем симулируем click чтобы дропдаун открылся.
 st.markdown("""
 <script>
 (function() {
-    // ── Фикс клавиатуры на iPad: НЕ фокусируем select-инпуты на touch-устройствах ──
-    // iOS Safari игнорирует inputmode="none" поставленный через JS после факта.
-    // Решение: на touch-устройстве вообще не вызывать origFocus() для combobox/select.
-    // Дропдаун открывается через touch-хэндлер контейнера без фокуса инпута.
-    (function() {
-        var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        if (!isTouchDevice) return;
-        var _origFocus = HTMLInputElement.prototype.focus;
-        HTMLInputElement.prototype.focus = function(opts) {
-            var el = this;
-            var isDropdown = (
-                el.getAttribute('role') === 'combobox' ||
-                !!(el.closest && el.closest('[data-baseweb="select"]')) ||
-                !!(el.closest && el.closest('[data-baseweb="popover"]')) ||
-                !!(el.closest && el.closest('[data-baseweb="menu"]'))
-            );
-            if (isDropdown) {
-                return; // не фокусируем — клавиатура не появится
-            }
-            return _origFocus.call(this, opts);
-        };
-    })();
-
-    function noKeyboardOnSelects() {
-        document.querySelectorAll(
-            '[data-baseweb="select"] input, input[role="combobox"], [data-baseweb="popover"] input'
-        ).forEach(function(el) {
-            el.setAttribute('inputmode', 'none');
-            el.setAttribute('autocomplete', 'off');
-            el.setAttribute('autocorrect', 'off');
-            el.setAttribute('autocapitalize', 'none');
-            el.setAttribute('spellcheck', 'false');
-        });
+    var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (isTouchDevice) {
+        document.addEventListener('touchstart', function(e) {
+            var t = e.target;
+            // Если касание внутри открытого дропдауна — не мешаем (нужно выбрать вариант)
+            if (t.closest && (
+                t.closest('[data-baseweb="popover"]') ||
+                t.closest('[data-baseweb="menu"]')
+            )) return;
+            // Проверяем: касание попало в select-контейнер?
+            var sel = t.closest && t.closest('[data-baseweb="select"]');
+            if (!sel) return;
+            // Блокируем нативный focus → iOS не откроет клавиатуру
+            e.preventDefault();
+            // Симулируем click чтобы BaseWeb открыл дропдаун (без фокуса)
+            setTimeout(function() {
+                var inner = sel.querySelector('div') || sel;
+                inner.dispatchEvent(new MouseEvent('click', {
+                    bubbles: true, cancelable: true, view: window
+                }));
+            }, 30);
+        }, {passive: false, capture: true});
     }
-    var obs = new MutationObserver(noKeyboardOnSelects);
-    obs.observe(document.body, {childList: true, subtree: true});
-    noKeyboardOnSelects();
-    document.addEventListener('pointerdown', noKeyboardOnSelects, true);
 
     // Прижимаем кнопку открытия сайдбара к левому краю
-    // Streamlit каждый рендер ставит left=<ширина сайдбара> — перебиваем setInterval
     function fixSidebarBtn() {
         var el = document.querySelector('[data-testid="collapsedControl"]');
         if (!el) return;
-        var rect = el.getBoundingClientRect();
-        if (rect.left === 0) return;
+        if (el.getBoundingClientRect().left === 0) return;
         el.style.cssText += ';position:fixed!important;left:0px!important;top:0px!important;margin:0px!important;transform:none!important;z-index:99999!important;';
     }
     setInterval(fixSidebarBtn, 200);
